@@ -16,6 +16,15 @@ SearchIn = Literal["title", "description", "both"]
 OrderSide = Literal["buy", "sell"]
 OrderType = Literal["market", "limit"]
 OutcomeType = Literal["yes", "no", "up", "down"]
+PriceMode = Literal["normalized", "raw"]
+
+
+@dataclass
+class RequestOptions:
+    """Optional request options for exchange methods."""
+
+    mode: Optional[PriceMode] = None
+    """Price mode. Use 'raw' to skip normalization when supported."""
 
 
 @dataclass
@@ -447,4 +456,3 @@ class EventFilterCriteria(TypedDict, total=False):
     total_volume: MinMax
 
 EventFilterFunction = Callable[[UnifiedEvent], bool]
-
