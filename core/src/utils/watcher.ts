@@ -27,7 +27,7 @@ export type ActivityBuilder = (
     data: unknown,
     address: string,
     types: WatchedAddressOption[],
-    lastActivity?: WatchedAddressActivity,
+    lastActivity?: WatchedAddressActivity | null,
 ) => WatchedEventActivity | null;
 
 // ----------------------------------------------------------------------------
