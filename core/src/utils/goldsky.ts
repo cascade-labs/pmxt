@@ -17,10 +17,14 @@ export interface GoldSkyConfig {
     /**
      * GoldSky GraphQL WebSocket endpoint (graphql-transport-ws protocol).
      *
+     * In the Goldsky managed community project there exists the uniswap-v3-base/1.0.0
+     * subgraph with a tag of prod
+     * @default: https://https://api.goldsky.com/api/public/project_cl8ylkiw00krx0hvza0qw17vn/subgraphs/uniswap-v3-base/1.0.0/gn
+     *
      * Format for hosted subgraphs:
      *   `wss://api.goldsky.com/api/public/<project-id>/subgraphs/<name>/<version>/gn`
      */
-    wsEndpoint: string;
+    wsEndpoint?: string;
 
     /** API key sent as `Authorization: Bearer <key>` in `connection_init`.
      * If private endpoints are needed to restrict access to your subgraph
@@ -205,8 +209,8 @@ export const buildPolymarketTradesActivity: ActivityBuilder = (data, address, ty
     const trades: Trade[] = filled.map((f: any): Trade => {
         const isMaker = (f.maker as string)?.toLowerCase() === addr;
         // assetId == 0 means USDC; anything else is a CTF outcome token
-        const myAssetId = BigInt(isMaker ? f.makerAssetId : f.takerAssetId);
-        const isBuying = myAssetId === 0n; // spending USDC → is a buy
+        const currAssetId = BigInt(isMaker ? f.makerAssetId : f.takerAssetId);
+        const isBuying = currAssetId === 0n; // spending USDC → is a buy
 
         // Resolve the CTF share amount and USDC amount based on role and side
         let shareAmount: number;
@@ -235,6 +239,7 @@ export const buildPolymarketTradesActivity: ActivityBuilder = (data, address, ty
             price: shareAmount > 0 ? usdcAmount / shareAmount : 0,
             amount: shareAmount,
             side: isBuying ? 'buy' : 'sell',
+            outcomeId: isMaker? f.makerAssetId : f.takerAssetId,
         };
     });
 
@@ -395,7 +400,8 @@ export class GoldSkySubscriber implements AddressSubscriber {
         if (this.connectPromise) return this.connectPromise;
 
         this.connectPromise = new Promise<void>((resolve, reject) => {
-            const ws = new WebSocket(this.config.wsEndpoint, ['graphql-transport-ws']);
+            const wsEndpoint = this.config.wsEndpoint ?? "https://https://api.goldsky.com/api/public/project_cl8ylkiw00krx0hvza0qw17vn/subgraphs/uniswap-v3-base/1.0.0/gn";
+            const ws = new WebSocket(wsEndpoint, ['graphql-transport-ws']);
             this.ws = ws;
 
             const connectTimeout = setTimeout(() => {
