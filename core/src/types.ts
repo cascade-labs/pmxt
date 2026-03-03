@@ -88,6 +88,7 @@ export interface Trade {
     price: number;
     amount: number;
     side: 'buy' | 'sell' | 'unknown';
+    outcomeId?: string;
 }
 
 export interface UserTrade extends Trade {
