@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.3] - 2026-03-04
+
+### Fixed
+
+- **TypeScript build failure due to missing `buildOrder` and `submitOrder` in exchange `has` objects**: When the new build-only order methods were added to the `ExchangeHas` interface, several exchange implementations were not updated to include these properties. Added `buildOrder: false` and `submitOrder: false` to BaoziExchange, LimitlessExchange, MyriadExchange, and ProbableExchange to match the interface requirements.
+
 ## [2.19.1] - 2026-03-04
 
 ### Fixed
