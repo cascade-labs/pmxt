@@ -410,6 +410,80 @@ paths:
                       data:
                         $ref: '#/components/schemas/Order'
       description: Place a new order on the exchange.
+  '/api/{exchange}/buildOrder':
+    post:
+      summary: Build Order
+      operationId: buildOrder
+      parameters:
+        - $ref: '#/components/parameters/ExchangeParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: BuildOrderRequest
+              type: object
+              properties:
+                args:
+                  type: array
+                  maxItems: 1
+                  items:
+                    $ref: '#/components/schemas/CreateOrderParams'
+                  minItems: 1
+                credentials:
+                  $ref: '#/components/schemas/ExchangeCredentials'
+              required:
+                - args
+      responses:
+        '200':
+          description: Build Order response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BuiltOrder'
+      description: >-
+        Build an order payload without submitting it to the exchange. Returns the exchange-native signed order or
+        request body for inspection, forwarding through a middleware layer, or deferred submission via submitOrder().
+  '/api/{exchange}/submitOrder':
+    post:
+      summary: Submit Order
+      operationId: submitOrder
+      parameters:
+        - $ref: '#/components/parameters/ExchangeParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: SubmitOrderRequest
+              type: object
+              properties:
+                args:
+                  type: array
+                  maxItems: 1
+                  items:
+                    $ref: '#/components/schemas/BuiltOrder'
+                  minItems: 1
+                credentials:
+                  $ref: '#/components/schemas/ExchangeCredentials'
+              required:
+                - args
+      responses:
+        '200':
+          description: Submit Order response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Order'
+      description: Submit a pre-built order returned by buildOrder().
   '/api/{exchange}/cancelOrder':
     post:
       summary: Cancel Order
@@ -950,6 +1024,39 @@ paths:
       description: >-
         Watch trade executions in real-time via WebSocket. Returns a promise that resolves with the next trade(s). Call
         repeatedly in a loop to stream updates (CCXT Pro pattern).
+  '/api/{exchange}/testDummyMethod':
+    post:
+      summary: Test Dummy Method
+      operationId: testDummyMethod
+      parameters:
+        - $ref: '#/components/parameters/ExchangeParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: TestDummyMethodRequest
+              type: object
+              properties:
+                args:
+                  type: array
+                  maxItems: 1
+                  items:
+                    type: string
+                credentials:
+                  $ref: '#/components/schemas/ExchangeCredentials'
+      responses:
+        '200':
+          description: Test Dummy Method response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+      description: Test method for auto-generation verification.
   '/api/{exchange}/close':
     post:
       summary: Close
@@ -976,9 +1083,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BaseResponse'
-      description: >-
-        Close all WebSocket connections and clean up resources. Call this when you're done streaming to properly release
-        connections.
 components:
   parameters:
     ExchangeParam:

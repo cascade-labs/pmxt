@@ -41,6 +41,7 @@ const TYPE_REF_MAP = {
   CreateOrderParams: 'CreateOrderParams',
   MyTradesParams: 'MyTradesParams',
   OrderHistoryParams: 'OrderHistoryParams',
+  BuiltOrder: 'BuiltOrder',
 };
 
 // ---------------------------------------------------------------------------

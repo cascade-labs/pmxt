@@ -1,6 +1,6 @@
 import { createHmac } from 'crypto';
 import { PredictionMarketExchange, MarketFilterParams, HistoryFilterParams, OHLCVParams, TradesParams, ExchangeCredentials, EventFetchParams, MyTradesParams } from '../../BaseExchange';
-import { UnifiedMarket, UnifiedEvent, PriceCandle, OrderBook, Trade, UserTrade, Order, Position, Balance, CreateOrderParams } from '../../types';
+import { UnifiedMarket, UnifiedEvent, PriceCandle, OrderBook, Trade, UserTrade, Order, Position, Balance, CreateOrderParams, BuiltOrder } from '../../types';
 import { parseOpenApiSpec } from '../../utils/openapi';
 import { fetchMarkets } from './fetchMarkets';
 import { fetchEvents } from './fetchEvents';
@@ -10,6 +10,7 @@ import { fetchOrderBook } from './fetchOrderBook';
 import { fetchTrades } from './fetchTrades';
 import { PolymarketAuth } from './auth';
 import { Side, OrderType, AssetType } from '@polymarket/clob-client';
+import type { SignedOrder } from '@polymarket/order-utils';
 import { PolymarketWebSocket, PolymarketWebSocketConfig } from './websocket';
 import { polymarketErrorMapper } from './errors';
 import { AuthenticationError } from '../../errors';
@@ -43,6 +44,8 @@ export class PolymarketExchange extends PredictionMarketExchange {
         fetchMyTrades: true as const,
         fetchClosedOrders: false as const,
         fetchAllOrders: false as const,
+        buildOrder: true as const,
+        submitOrder: true as const,
     };
 
     private auth?: PolymarketAuth;
@@ -273,67 +276,75 @@ export class PolymarketExchange extends PredictionMarketExchange {
         ]);
     }
 
-    async createOrder(params: CreateOrderParams): Promise<Order> {
+    async buildOrder(params: CreateOrderParams): Promise<BuiltOrder> {
         try {
             const auth = this.ensureAuth();
             const client = await auth.getClobClient();
 
-            // Map side to Polymarket enum
             const side = params.side.toUpperCase() === 'BUY' ? Side.BUY : Side.SELL;
-
-            // For limit orders, price is required
-            if (params.type === 'limit' && !params.price) {
-                throw new Error('Price is required for limit orders');
-            }
-
-            // For market orders, use max slippage: 0.99 for BUY (willing to pay up to 99%), 0.01 for SELL (willing to accept down to 1%)
             const price = params.price || (side === Side.BUY ? 0.99 : 0.01);
-
-            // Use provided tickSize, or let the SDK resolve it from its own cache / API
             const tickSize = params.tickSize ? params.tickSize.toString() : undefined;
 
             const orderArgs: any = {
                 tokenID: params.outcomeId,
-                price: price,
-                side: side,
+                price,
+                side,
                 size: params.amount,
             };
-
-            if (params.fee !== undefined && params.fee !== null) {
-                orderArgs.feeRateBps = params.fee;
-            }
+            if (params.fee != null) orderArgs.feeRateBps = params.fee;
 
             const options: any = {};
-            if (tickSize) {
-                options.tickSize = tickSize;
-            }
-            if (params.negRisk !== undefined) {
-                options.negRisk = params.negRisk;
-            }
+            if (tickSize) options.tickSize = tickSize;
+            if (params.negRisk !== undefined) options.negRisk = params.negRisk;
 
-            const response = await client.createAndPostOrder(orderArgs, options);
-
-            if (!response || !response.success) {
-                throw new Error(`${response?.errorMsg || 'Order placement failed'} (Response: ${JSON.stringify(response)})`);
-            }
+            const signedOrder = await client.createOrder(orderArgs, options);
 
             return {
-                id: response.orderID,
-                marketId: params.marketId,
-                outcomeId: params.outcomeId,
-                side: params.side,
-                type: params.type,
-                price: price,
-                amount: params.amount,
-                status: 'open',
-                filled: 0,
-                remaining: params.amount,
-                fee: params.fee,
-                timestamp: Date.now()
+                exchange: this.name,
+                params,
+                signedOrder: signedOrder as Record<string, unknown>,
+                raw: signedOrder,
             };
         } catch (error: any) {
             throw polymarketErrorMapper.mapError(error);
         }
+    }
+
+    async submitOrder(built: BuiltOrder): Promise<Order> {
+        try {
+            const auth = this.ensureAuth();
+            const client = await auth.getClobClient();
+
+            const response = await client.postOrder(built.raw as SignedOrder);
+
+            if (!response || !response.success) {
+                throw new Error(`${response?.errorMsg || 'Order submission failed'} (Response: ${JSON.stringify(response)})`);
+            }
+
+            const side = built.params.side.toUpperCase() === 'BUY' ? Side.BUY : Side.SELL;
+            const price = built.params.price || (side === Side.BUY ? 0.99 : 0.01);
+            return {
+                id: response.orderID,
+                marketId: built.params.marketId,
+                outcomeId: built.params.outcomeId,
+                side: built.params.side,
+                type: built.params.type,
+                price,
+                amount: built.params.amount,
+                status: 'open',
+                filled: 0,
+                remaining: built.params.amount,
+                fee: built.params.fee,
+                timestamp: Date.now(),
+            };
+        } catch (error: any) {
+            throw polymarketErrorMapper.mapError(error);
+        }
+    }
+
+    async createOrder(params: CreateOrderParams): Promise<Order> {
+        const built = await this.buildOrder(params);
+        return this.submitOrder(built);
     }
 
     async cancelOrder(orderId: string): Promise<Order> {

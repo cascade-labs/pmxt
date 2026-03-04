@@ -1,4 +1,4 @@
-import { UnifiedMarket, UnifiedEvent, PriceCandle, CandleInterval, OrderBook, Trade, UserTrade, Order, Position, Balance, CreateOrderParams } from './types';
+import { UnifiedMarket, UnifiedEvent, PriceCandle, CandleInterval, OrderBook, Trade, UserTrade, Order, Position, Balance, CreateOrderParams, BuiltOrder } from './types';
 import { getExecutionPrice, getExecutionPriceDetailed, ExecutionPriceResult } from './utils/math';
 import { MarketNotFound, EventNotFound } from './errors';
 import { Throttler } from './utils/throttler';
@@ -174,6 +174,8 @@ export interface ExchangeHas {
     fetchMyTrades: ExchangeCapability;
     fetchClosedOrders: ExchangeCapability;
     fetchAllOrders: ExchangeCapability;
+    buildOrder: ExchangeCapability;
+    submitOrder: ExchangeCapability;
 }
 
 export interface ExchangeCredentials {
@@ -263,6 +265,8 @@ export abstract class PredictionMarketExchange {
         fetchMyTrades: false,
         fetchClosedOrders: false,
         fetchAllOrders: false,
+        buildOrder: false,
+        submitOrder: false,
     };
 
     constructor(credentials?: ExchangeCredentials, options?: ExchangeOptions) {
@@ -717,6 +721,62 @@ export abstract class PredictionMarketExchange {
      */
     async createOrder(params: CreateOrderParams): Promise<Order> {
         throw new Error("Method createOrder not implemented.");
+    }
+
+    /**
+     * Build an order payload without submitting it to the exchange.
+     * Returns the exchange-native signed order or request body for inspection,
+     * forwarding through a middleware layer, or deferred submission via submitOrder().
+     *
+     * @param params - Order parameters (same as createOrder)
+     * @returns A BuiltOrder containing the exchange-native payload
+     *
+     * @example-ts Build then inspect a Polymarket order
+     * const built = await exchange.buildOrder({
+     *   marketId: market.marketId,
+     *   outcomeId: market.yes.outcomeId,
+     *   side: 'buy',
+     *   type: 'limit',
+     *   amount: 10,
+     *   price: 0.55
+     * });
+     * console.log(built.signedOrder); // EIP-712 signed order struct
+     * const order = await exchange.submitOrder(built);
+     *
+     * @example-python Build then submit a Polymarket order
+     * built = exchange.build_order(
+     *     market_id=market.market_id,
+     *     outcome_id=market.yes.outcome_id,
+     *     side='buy',
+     *     type='limit',
+     *     amount=10,
+     *     price=0.55
+     * )
+     * print(built.signed_order)
+     * order = exchange.submit_order(built)
+     */
+    async buildOrder(params: CreateOrderParams): Promise<BuiltOrder> {
+        throw new Error("Method buildOrder not implemented.");
+    }
+
+    /**
+     * Submit a pre-built order returned by buildOrder().
+     *
+     * @param built - A BuiltOrder from buildOrder()
+     * @returns The submitted order
+     *
+     * @example-ts Submit a pre-built order
+     * const built = await exchange.buildOrder(params);
+     * const order = await exchange.submitOrder(built);
+     * console.log(`Order ${order.id}: ${order.status}`);
+     *
+     * @example-python Submit a pre-built order
+     * built = exchange.build_order(params)
+     * order = exchange.submit_order(built)
+     * print(f"Order {order.id}: {order.status}")
+     */
+    async submitOrder(built: BuiltOrder): Promise<Order> {
+        throw new Error("Method submitOrder not implemented.");
     }
 
     /**
