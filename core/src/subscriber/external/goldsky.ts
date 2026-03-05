@@ -117,7 +117,7 @@ const BUILD_POLYMARKET_PNL_QUERY = (address: string, url?: string): GoldSkyGraph
         query GetPolymarketPnl($address: String!) {
             userPositions(
                 where: { user: $address, amount_gt: "0" }
-                first: 10
+                first: 1000
                 orderBy: id
                 orderDirection: desc
             ) {
@@ -131,13 +131,13 @@ const BUILD_POLYMARKET_PNL_QUERY = (address: string, url?: string): GoldSkyGraph
     variables: { address: address.toLowerCase() },
 });
 
-const BUILD_POLYMARKET_POSITIONS_QUERY = (address: string, tokenIds: string[], url?: string): GoldSkyGraphQlQuery => ({
+const BUILD_POLYMARKET_POSITIONS_QUERY = (_address: string, tokenIds: string[], url?: string): GoldSkyGraphQlQuery => ({
     url: url ?? POLYMARKET_POSITIONS_ENDPOINT,
     query: `
-        query GetPolymarketPositions($address: String!, $tokenIds: [String!]!) {
+        query GetPolymarketPositions($tokenIds: [String!]!) {
             userBalances(
-                where: { user: $address, asset_in: $tokenIds }
-                first: 10
+                where: { asset_in: $tokenIds }
+                first: 1000
                 orderBy: id
                 orderDirection: desc
             ) {
@@ -151,7 +151,7 @@ const BUILD_POLYMARKET_POSITIONS_QUERY = (address: string, tokenIds: string[], u
             }
         }
     `,
-    variables: { address: address.toLowerCase(), tokenIds },
+    variables: { tokenIds },
 });
 
 // ----------------------------------------------------------------------------
@@ -298,11 +298,11 @@ export const buildPolymarketTradesActivity: SubscribedActivityBuilder = (data, a
  * `userPositions` (PNL) and `userBalances` (positions) are guaranteed
  * to share the same tokenIds since step 2 is filtered by step 1's results.
  *
- * `currentPrice` and `unrealizedPnL` are left at -1 (not available on-chain).
+ * `currentPrice` and `unrealizedPnL` are left at 0 (not available on-chain).
  */
 /**
  * Derives `Position[]` from joined PNL (`userPositions`) + metadata (`userBalances`).
- * `currentPrice` and `unrealizedPnL` are left at -1 (not available on-chain).
+ * `currentPrice` and `unrealizedPnL` are left at 0 (not available on-chain).
  */
 export const buildPolymarketPositionsActivity: SubscribedActivityBuilder = (data, _address, types): SubscribedResult | null => {
     if (!types.includes('positions')) return null;
@@ -328,8 +328,8 @@ export const buildPolymarketPositionsActivity: SubscribedActivityBuilder = (data
             outcomeLabel: (meta?.outcomeIndex ?? 0) === 1 ? 'Yes' : 'No',
             size: Number(BigInt(p.amount ?? '0')) / 1e6,
             entryPrice: Number(BigInt(p.avgPrice ?? '0')) / 1e6,
-            currentPrice: -1, // Not available on-chain
-            unrealizedPnL: -1,  // Not available on-chain
+            currentPrice: 0, // Not available on-chain
+            unrealizedPnL: 0,  // Not available on-chain
             realizedPnL: Number(BigInt(p.realizedPnl ?? '0')) / 1e6,
         };
     });

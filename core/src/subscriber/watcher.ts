@@ -1,11 +1,11 @@
-import { Balance, Position, QueuedPromise, Trade } from '../types';
+import { QueuedPromise, Trade } from '../types';
 import {
     BaseSubscriber,
     SubscribedActivityBuilder,
     SubscribedAddressSnapshot,
     SubscriberConfig,
-    SubscriptionOption
-} from "./base";
+    SubscriptionOption,
+} from './base';
 
 export type FetchFn = (address: string, types: SubscriptionOption[]) => Promise<SubscribedAddressSnapshot>;
 
@@ -36,7 +36,7 @@ export interface AddressWatcherConfig {
     buildActivity?: SubscribedActivityBuilder;
 }
 
-export interface WatcherConfig extends Omit<SubscriberConfig, "buildSubscription"> {
+export interface WatcherConfig extends Omit<SubscriberConfig, 'buildSubscription'> {
 }
 
 
@@ -87,23 +87,16 @@ export class AddressWatcher {
     async watch(address: string, types: SubscriptionOption[], assetId?: string): Promise<SubscribedAddressSnapshot | Trade[]> {
         const key = address.toLowerCase();
 
-        if (!this.watchedTypes.has(key)) {
-            this.watchedTypes.set(key, types);
+        const currTypes = this.watchedTypes.get(key) ?? [];
+        const newTypes = [...new Set([...currTypes, ...types])];
 
-            await this.subscriber.subscribe(address, (data) => this.handleSubscriptionData(address, data));
+        this.watchedTypes.set(key, newTypes);
 
-            const initial = await this.fetchFn(address, types);
-            this.lastState.set(key, initial);
+        const diff = newTypes.filter(x => !currTypes.includes(x));
 
-            if (assetId) {
-                return initial.trades?.filter(t => t.outcomeId === assetId) ?? [];
-            }
-            return initial;
+        if (diff.length > 0) {
+            await this.subscriber.subscribe(address, newTypes, (data) => this.handleSubscriptionData(address, data));
         }
-
-        // Address already watched — merge any new types into the polling set
-        const currTypes = this.watchedTypes.get(key)!;
-        this.watchedTypes.set(key, [...new Set([...currTypes, ...types])]);
 
         if (assetId) {
             const assetKey = `${key} ${assetId}`;
@@ -185,7 +178,6 @@ export class AddressWatcher {
 
             let merged: SubscribedAddressSnapshot;
             if (partial === null) {
-                // No buildActivity or it returned null — full fetch for all types.
                 merged = await this.fetchFn(address, types);
             } else {
                 const missingTypes = types.filter(t => !(t in partial)) as SubscriptionOption[];
@@ -198,14 +190,15 @@ export class AddressWatcher {
             }
 
             const last = this.lastState.get(key);
-            if (!last || this.activitiesChanged(last, merged)) {
+            const value = last ? this.getChanged(last, merged) : merged;
+            if (last && this.hasChanges(value)) {
                 this.lastState.set(key, merged);
                 const resolvers = this.resolvers.get(key);
                 if (resolvers?.length) {
-                    resolvers.forEach(r => r.resolve(merged));
+                    resolvers.forEach(r => r.resolve(value));
                     this.resolvers.set(key, []);
                 }
-                this.dispatchAssetResolvers(key, merged);
+                this.dispatchAssetResolvers(key, value);
             }
         } catch {
         }
@@ -223,43 +216,33 @@ export class AddressWatcher {
         }
     }
 
-    private activitiesChanged(prev: SubscribedAddressSnapshot, curr: SubscribedAddressSnapshot): boolean {
-        // Trades: count or most-recent ID changed
-        if (prev.trades !== undefined && curr.trades !== undefined) {
-            if (prev.trades.length !== curr.trades.length) return true;
-            if (prev.trades.length > 0 && prev.trades[0].id !== curr.trades[0].id) return true;
-        } else if (prev.trades !== undefined || curr.trades !== undefined) {
-            return true;
+    private getChanged(prev: SubscribedAddressSnapshot, curr: SubscribedAddressSnapshot): SubscribedAddressSnapshot {
+        const changed: SubscribedAddressSnapshot = { address: curr.address, timestamp: curr.timestamp };
+
+        if (curr.trades !== undefined) {
+            const prevIds = new Set(prev.trades?.map(t => t.id) ?? []);
+            changed.trades = curr.trades.filter(t => !prevIds.has(t.id));
         }
 
-        // Positions: count or any (marketId, size) pair changed
-        if (prev.positions !== undefined && curr.positions !== undefined) {
-            if (prev.positions.length !== curr.positions.length) return true;
-            const sort = (ps: Position[]) =>
-                [...ps].sort((a, b) => a.marketId.localeCompare(b.marketId));
-            const sp = sort(prev.positions);
-            const sc = sort(curr.positions);
-            for (let i = 0; i < sp.length; i++) {
-                if (sp[i].marketId !== sc[i].marketId || sp[i].size !== sc[i].size) return true;
-            }
-        } else if (prev.positions !== undefined || curr.positions !== undefined) {
-            return true;
+        if (curr.positions !== undefined) {
+            const prevSizeByOutcome = new Map(prev.positions?.map(p => [p.outcomeId, p.size]) ?? []);
+            changed.positions = curr.positions.filter(p =>
+                !prevSizeByOutcome.has(p.outcomeId) || prevSizeByOutcome.get(p.outcomeId) !== p.size,
+            );
         }
 
-        // Balances: count or any total changed
-        if (prev.balances !== undefined && curr.balances !== undefined) {
-            if (prev.balances.length !== curr.balances.length) return true;
-            const sort = (bs: Balance[]) =>
-                [...bs].sort((a, b) => a.currency.localeCompare(b.currency));
-            const sb = sort(prev.balances);
-            const cb = sort(curr.balances);
-            for (let i = 0; i < sb.length; i++) {
-                if (sb[i].total !== cb[i].total) return true;
-            }
-        } else if (prev.balances !== undefined || curr.balances !== undefined) {
-            return true;
+        if (curr.balances !== undefined) {
+            const prevTotalByCurrency = new Map(prev.balances?.map(b => [b.currency, b.total]) ?? []);
+            changed.balances = curr.balances.filter(b =>
+                !prevTotalByCurrency.has(b.currency) || prevTotalByCurrency.get(b.currency) !== b.total,
+            );
         }
+        return changed;
+    }
 
-        return false;
+    private hasChanges(value: SubscribedAddressSnapshot): boolean {
+        if (value.trades !== undefined && value.trades.length > 0) return true;
+        if (value.positions !== undefined && value.positions.length > 0) return true;
+        return value.balances !== undefined && value.balances.length > 0;
     }
 }
