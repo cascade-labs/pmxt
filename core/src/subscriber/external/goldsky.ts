@@ -101,7 +101,7 @@ const BUILD_POLYMARKET_TRADES_AS_TAKER_QUERY = (address: string, url?: string): 
         query GetPolymarketTradesTaker($address: Bytes!) {
             orderFilledEvents(
                 where: { taker: $address }
-                first: 5
+                first: 20
                 orderBy: timestamp
                 orderDirection: desc
             ) {${TRADES_FIELDS}
@@ -119,7 +119,7 @@ const BUILD_POLYMARKET_PNL_QUERY = (address: string, url?: string): GoldSkyGraph
                 where: { user: $address, amount_gt: "0" }
                 first: 1000
                 orderBy: id
-                orderDirection: desc
+                orderDirection: asc
             ) {
                 tokenId
                 amount
@@ -134,19 +134,17 @@ const BUILD_POLYMARKET_PNL_QUERY = (address: string, url?: string): GoldSkyGraph
 const BUILD_POLYMARKET_POSITIONS_QUERY = (_address: string, tokenIds: string[], url?: string): GoldSkyGraphQlQuery => ({
     url: url ?? POLYMARKET_POSITIONS_ENDPOINT,
     query: `
-        query GetPolymarketPositions($tokenIds: [String!]!) {
-            userBalances(
-                where: { asset_in: $tokenIds }
+        query GetPolymarketPositions($tokenIds: [ID!]!) {
+            tokenIdConditions(
+                where: { id_in: $tokenIds }
                 first: 1000
                 orderBy: id
-                orderDirection: desc
+                orderDirection: asc
             ) {
-                asset {
+                id
+                outcomeIndex
+                condition {
                     id
-                    outcomeIndex
-                    condition {
-                        id
-                    }
                 }
             }
         }
@@ -192,13 +190,12 @@ export const POLYMARKET_DEFAULT_SUBSCRIPTION: GoldSkySubscriptionBuilder = async
             }
         }
         trades.sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
-        result.orderFilledEvents = trades.slice(0, 5);
+        result.orderFilledEvents = trades;
     }
 
     if (pnlData) {
         const sorted = ((pnlData.userPositions as any[]) ?? [])
-            .sort((a, b) => Number(BigInt(b.amount ?? '0') - BigInt(a.amount ?? '0')))
-            .slice(0, 10);
+            .sort((a, b) => parseFloat(b.amount ?? '0') - parseFloat(a.amount ?? '0'));
         result.userPositions = sorted;
 
         const tokenIds = sorted.map((p: any) => String(p.tokenId));
@@ -263,19 +260,19 @@ export const buildPolymarketTradesActivity: SubscribedActivityBuilder = (data, a
         let usdcAmount: number;
         if (isMaker) {
             if (isBuying) {
-                usdcAmount = Number(BigInt(f.makerAmountFilled)) / 1e6;
-                shareAmount = Number(BigInt(f.takerAmountFilled)) / 1e6;
+                usdcAmount = parseFloat(f.makerAmountFilled) / 1e6;
+                shareAmount = parseFloat(f.takerAmountFilled) / 1e6;
             } else {
-                shareAmount = Number(BigInt(f.makerAmountFilled)) / 1e6;
-                usdcAmount = Number(BigInt(f.takerAmountFilled)) / 1e6;
+                shareAmount = parseFloat(f.makerAmountFilled) / 1e6;
+                usdcAmount = parseFloat(f.takerAmountFilled) / 1e6;
             }
         } else {
             if (isBuying) {
-                usdcAmount = Number(BigInt(f.takerAmountFilled)) / 1e6;
-                shareAmount = Number(BigInt(f.makerAmountFilled)) / 1e6;
+                usdcAmount = parseFloat(f.takerAmountFilled) / 1e6;
+                shareAmount = parseFloat(f.makerAmountFilled) / 1e6;
             } else {
-                shareAmount = Number(BigInt(f.takerAmountFilled)) / 1e6;
-                usdcAmount = Number(BigInt(f.makerAmountFilled)) / 1e6;
+                shareAmount = parseFloat(f.takerAmountFilled) / 1e6;
+                usdcAmount = parseFloat(f.makerAmountFilled) / 1e6;
             }
         }
 
@@ -310,12 +307,12 @@ export const buildPolymarketPositionsActivity: SubscribedActivityBuilder = (data
     const pnlRows: any[] = (data as any)?.userPositions ?? [];
     if (pnlRows.length === 0) return null;
 
-    const balanceRows: any[] = (data as any)?.userBalances ?? [];
+    const conditionRows: any[] = (data as any)?.tokenIdConditions ?? [];
     const metaByToken = new Map<string, { marketId: string; outcomeIndex: number }>();
-    for (const b of balanceRows) {
-        metaByToken.set(b.asset?.id ?? '', {
-            marketId: b.asset?.condition?.id ?? '',
-            outcomeIndex: Number(b.asset?.outcomeIndex ?? 0),
+    for (const c of conditionRows) {
+        metaByToken.set(c.id ?? '', {
+            marketId: c.condition?.id ?? '',
+            outcomeIndex: Number(c.outcomeIndex ?? 0),
         });
     }
 
@@ -326,11 +323,11 @@ export const buildPolymarketPositionsActivity: SubscribedActivityBuilder = (data
             marketId: meta?.marketId ?? '',
             outcomeId: tokenId,
             outcomeLabel: (meta?.outcomeIndex ?? 0) === 1 ? 'Yes' : 'No',
-            size: Number(BigInt(p.amount ?? '0')) / 1e6,
-            entryPrice: Number(BigInt(p.avgPrice ?? '0')) / 1e6,
+            size: parseFloat(p.amount ?? '0') / 1e6,
+            entryPrice: parseFloat(p.avgPrice ?? '0') / 1e6,
             currentPrice: 0, // Not available on-chain
             unrealizedPnL: 0,  // Not available on-chain
-            realizedPnL: Number(BigInt(p.realizedPnl ?? '0')) / 1e6,
+            realizedPnL: parseFloat(p.realizedPnl ?? '0') / 1e6,
         };
     });
 
@@ -371,7 +368,7 @@ export const buildLimitlessBalanceActivity: SubscribedActivityBuilder = (data, a
     const t = transfers[0];
     const addr = address.toLowerCase();
     const isIncoming = (t.to as string)?.toLowerCase() === addr;
-    const delta = Number(BigInt(t.value)) / 1e6;
+    const delta = parseFloat(t.value) / 1e6;
     const newTotal = Math.max(0, isIncoming ? prev.total + delta : prev.total - delta);
 
     return {

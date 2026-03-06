@@ -191,8 +191,9 @@ export class AddressWatcher {
 
             const last = this.lastState.get(key);
             const value = last ? this.getChanged(last, merged) : merged;
+            this.lastState.set(key, merged);
+            // Ignore the fist snapshot and only deliver the changed fields
             if (last && this.hasChanges(value)) {
-                this.lastState.set(key, merged);
                 const resolvers = this.resolvers.get(key);
                 if (resolvers?.length) {
                     resolvers.forEach(r => r.resolve(value));
