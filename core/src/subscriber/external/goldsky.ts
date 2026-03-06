@@ -214,10 +214,10 @@ export const POLYMARKET_DEFAULT_SUBSCRIPTION: GoldSkySubscriptionBuilder = async
  *
  * Pair with `buildLimitlessBalanceActivity`.
  */
-export const LIMITLESS_DEFAULT_SUBSCRIPTION: GoldSkySubscriptionBuilder = async (address, types, fetch) => {
-    if (!types.includes('balances')) return null;
+export const LIMITLESS_DEFAULT_SUBSCRIPTION: GoldSkySubscriptionBuilder = async (address, types, fetch, baseUrl) => {
+    if (!types.includes('balances') || !baseUrl) return null;
     return fetch({
-        url: '', // Set via GoldSkyConfig.baseUrl in LimitlessWebSocket
+        url: baseUrl,
         query: /* GraphQL */ `
             query WatchLimitlessAddress($address: Bytes!) {
                 transfers(
