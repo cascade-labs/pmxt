@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.19.4] - 2026-03-06
+
+### Fixed
+
+- **Compliance Tests: Resilient Exchange Availability Checks**: Compliance tests no longer fail when an exchange's API is temporarily unavailable (e.g., Myriad returning a Heroku 503 error page). Previously, any `ExchangeNotAvailable` or `NetworkError` exception would propagate as a test failure, making CI fragile against external service outages. A new `isSkippableError(error)` helper in `core/test/compliance/shared.ts` returns `true` for these error types (plus the existing "not implemented" and "not supported" string checks), and all 18 compliance test files now call it uniformly instead of ad-hoc string comparisons. Tests now log a skip message and return instead of failing.
+
+- **`generate-openapi.test.ts` Spec Leak**: The OpenAPI auto-generation test temporarily injects a `testDummyMethod` into `BaseExchange.ts` and regenerates the spec to verify the generator works. However, `afterAll` only restored `BaseExchange.ts` — not `openapi.yaml` — leaving the `testDummyMethod` endpoint permanently in the committed spec and silently dropping the `close` endpoint's description. `afterAll` now also restores `openapi.yaml` to its pre-test state.
+
 ## [2.19.3] - 2026-03-04
 
 ### Fixed
