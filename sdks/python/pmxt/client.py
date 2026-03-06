@@ -5,12 +5,12 @@ This module provides clean, Pythonic wrappers around the auto-generated
 OpenAPI client, matching the JavaScript API exactly.
 """
 
+import json
 import os
 import sys
-from typing import List, Optional, Dict, Any, Literal, Union
+from abc import ABC
 from datetime import datetime
-from abc import ABC, abstractmethod
-import json
+from typing import List, Optional, Dict, Any, Literal, Union
 
 # Add generated client to path
 _GENERATED_PATH = os.path.join(os.path.dirname(__file__), "..", "generated")
@@ -1121,29 +1121,29 @@ class Exchange(ABC):
             return _convert_order_book(data)
         except ApiException as e:
             raise Exception(f"Failed to watch order book: {self._extract_api_error(e)}") from None
-    
+
     def watch_trades(
         self,
         outcome_id: str,
         address: Optional[str] = None,
         since: Optional[int] = None,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
     ) -> List[Trade]:
         """
         Watch real-time trade updates via WebSocket.
-        
+
         Returns a promise that resolves with the next trade(s).
         Call repeatedly in a loop to stream updates (CCXT Pro pattern).
-        
+
         Args:
             outcome_id: Outcome ID to watch
             address: Public wallet to be watched
             since: Optional timestamp to filter trades from
             limit: Optional limit for number of trades
-            
+
         Returns:
             Next trade update(s)
-            
+
         Example:
             >>> # Stream trade updates
             >>> while True:
@@ -1159,21 +1159,21 @@ class Exchange(ABC):
                 args.append(since)
             if limit is not None:
                 args.append(limit)
-            
+
             body_dict = {"args": args}
-            
+
             # Add credentials if available
             creds = self._get_credentials_dict()
             if creds:
                 body_dict["credentials"] = creds
-            
+
             request_body = internal_models.WatchTradesRequest.from_dict(body_dict)
-            
+
             response = self._api.watch_trades(
                 exchange=self.exchange_name,
                 watch_trades_request=request_body,
             )
-            
+
             data = self._handle_response(response.to_dict())
             return [_convert_trade(t) for t in data]
         except ApiException as e:
@@ -1228,40 +1228,40 @@ class Exchange(ABC):
         except ApiException as e:
             raise Exception(f"Failed to watch address: {self._extract_api_error(e)}") from None
 
-   def unwatch_address(
-       self,
-       address: str,
-   ) -> None:
-       """
-       Stop watching a previously registered wallet address and release its resource updates.
+    def unwatch_address(
+        self,
+        address: str,
+    ) -> None:
+        """
+        Stop watching a previously registered wallet address and release its resource updates.
 
-       Args:
-           address: Public wallet to be unwatched
+        Args:
+            address: Public wallet to be unwatched
 
-       Returns:
-           None
-       """
-       try:
-           args = [address]
+        Returns:
+            None
+        """
+        try:
+            args = [address]
 
-           body_dict = {"args": args}
+            body_dict = {"args": args}
 
-           # Add credentials if available
-           creds = self._get_credentials_dict()
-           if creds:
-               body_dict["credentials"] = creds
+            # Add credentials if available
+            creds = self._get_credentials_dict()
+            if creds:
+                body_dict["credentials"] = creds
 
-           request_body = internal_models.UnwatchAddressRequest.from_dict(body_dict)
+            request_body = internal_models.UnwatchAddressRequest.from_dict(body_dict)
 
-           response = self._api.unwatch_address(
-               exchange=self.exchange_name,
-               unwatch_address_request=request_body,
-           )
+            response = self._api.unwatch_address(
+                exchange=self.exchange_name,
+                unwatch_address_request=request_body,
+            )
 
-           data = self._handle_response(response.to_dict())
-           return data
-       except ApiException as e:
-           raise Exception(f"Failed to unwatch address: {self._extract_api_error(e)}") from None
+            data = self._handle_response(response.to_dict())
+            return data
+        except ApiException as e:
+            raise Exception(f"Failed to unwatch address: {self._extract_api_error(e)}") from None
 
     def watch_prices(self, market_address: str, callback: Optional[Any] = None) -> Any:
         """
