@@ -338,6 +338,26 @@ class Order:
 
 
 @dataclass
+class BuiltOrder:
+    """An order payload built but not yet submitted to the exchange."""
+
+    exchange: str
+    """The exchange name this order was built for."""
+
+    params: Dict[str, Any]
+    """The original params used to build this order."""
+
+    raw: Any
+    """The raw, exchange-native payload. Always present."""
+
+    signed_order: Optional[Dict[str, Any]] = None
+    """For CLOB exchanges (Polymarket): the EIP-712 signed order."""
+
+    tx: Optional[Dict[str, Any]] = None
+    """For on-chain AMM exchanges: the EVM transaction payload."""
+
+
+@dataclass
 class Position:
     """A current position in a market."""
     

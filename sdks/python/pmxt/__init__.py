@@ -31,6 +31,7 @@ from .models import (
     UserTrade,
     PaginatedMarketsResult,
     Order,
+    BuiltOrder,
     Position,
     Balance,
 )
@@ -78,6 +79,7 @@ __all__ = [
     "UserTrade",
     "PaginatedMarketsResult",
     "Order",
+    "BuiltOrder",
     "Position",
     "Balance",
 ]

@@ -11,6 +11,8 @@ import {
     FetchOHLCVRequest,
     FetchTradesRequest,
     CreateOrderRequest,
+    BuildOrderRequest,
+    SubmitOrderRequest,
     ExchangeCredentials,
 } from "../generated/src/index.js";
 
@@ -25,6 +27,7 @@ import {
     UserTrade,
     Order,
     BuiltOrder,
+    CreateOrderParams,
     Position,
     Balance,
     SearchIn,
@@ -518,27 +521,6 @@ export abstract class Exchange {
         }
     }
 
-    async submitOrder(built: any): Promise<Order> {
-        await this.initPromise;
-        try {
-            const args: any[] = [];
-            args.push(built);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/submitOrder`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
-            }
-            const json = await response.json();
-            const data = this.handleResponse(json);
-            return convertOrder(data);
-        } catch (error) {
-            throw new Error(`Failed to submitOrder: ${error}`);
-        }
-    }
 
     async cancelOrder(orderId: string): Promise<Order> {
         await this.initPromise;
@@ -927,34 +909,131 @@ export abstract class Exchange {
 
     // Trading Methods (require authentication)
 
-    async buildOrder(params: any): Promise<BuiltOrder> {
+    /**
+     * Build an order payload without submitting it to the exchange.
+     * Returns the exchange-native signed order or transaction payload for
+     * inspection, forwarding through a middleware layer, or deferred
+     * submission via {@link submitOrder}.
+     *
+     * You can specify the market either with explicit marketId/outcomeId,
+     * or by passing an outcome object directly (e.g., market.yes).
+     *
+     * @param params - Order parameters (same as createOrder)
+     * @returns A BuiltOrder containing the exchange-native payload
+     *
+     * @example
+     * ```typescript
+     * // Build, inspect, then submit:
+     * const built = await exchange.buildOrder({
+     *   marketId: "663583",
+     *   outcomeId: "10991849...",
+     *   side: "buy",
+     *   type: "limit",
+     *   amount: 10,
+     *   price: 0.55
+     * });
+     *
+     * console.log(built.signedOrder); // inspect before submitting
+     * const order = await exchange.submitOrder(built);
+     *
+     * // Using outcome shorthand:
+     * const built2 = await exchange.buildOrder({
+     *   outcome: market.yes,
+     *   side: "buy",
+     *   type: "market",
+     *   amount: 10
+     * });
+     * ```
+     */
+    async buildOrder(params: CreateOrderParams & { outcome?: MarketOutcome }): Promise<BuiltOrder> {
         await this.initPromise;
         try {
             let marketId = params.marketId;
             let outcomeId = params.outcomeId;
+
             if (params.outcome) {
                 if (marketId !== undefined || outcomeId !== undefined) {
-                    throw new Error('Provide either outcome or marketId/outcomeId, not both');
+                    throw new Error(
+                        "Cannot specify both 'outcome' and 'marketId'/'outcomeId'. Use one or the other."
+                    );
                 }
-                marketId = params.outcome.marketId;
-                outcomeId = params.outcome.outcomeId;
+                const outcome: MarketOutcome = params.outcome;
+                if (!outcome.marketId) {
+                    throw new Error(
+                        "outcome.marketId is not set. Ensure the outcome comes from a fetched market."
+                    );
+                }
+                marketId = outcome.marketId;
+                outcomeId = outcome.outcomeId;
             }
-            const paramsDict: any = { marketId, outcomeId, side: params.side, type: params.type, amount: params.amount };
-            if (params.price !== undefined) paramsDict.price = params.price;
-            if (params.fee !== undefined) paramsDict.fee = params.fee;
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/buildOrder`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args: [paramsDict], credentials: this.getCredentials() }),
+
+            const paramsDict: any = {
+                marketId,
+                outcomeId,
+                side: params.side,
+                type: params.type,
+                amount: params.amount,
+            };
+            if (params.price !== undefined) {
+                paramsDict.price = params.price;
+            }
+            if (params.fee !== undefined) {
+                paramsDict.fee = params.fee;
+            }
+
+            const requestBody: BuildOrderRequest = {
+                args: [paramsDict],
+                credentials: this.getCredentials()
+            };
+
+            const response = await this.api.buildOrder({
+                exchange: this.exchangeName as any,
+                buildOrderRequest: requestBody,
             });
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
-            }
-            const json = await response.json();
-            return this.handleResponse(json) as BuiltOrder;
+
+            const data = this.handleResponse(response);
+            return data as BuiltOrder;
         } catch (error) {
-            throw new Error(`Failed to buildOrder: ${error}`);
+            throw new Error(`Failed to build order: ${error}`);
+        }
+    }
+
+    /**
+     * Submit a pre-built order returned by {@link buildOrder}.
+     *
+     * @param built - The BuiltOrder payload from buildOrder()
+     * @returns The submitted order
+     *
+     * @example
+     * ```typescript
+     * const built = await exchange.buildOrder({
+     *   outcome: market.yes,
+     *   side: "buy",
+     *   type: "limit",
+     *   amount: 10,
+     *   price: 0.55
+     * });
+     * const order = await exchange.submitOrder(built);
+     * console.log(order.id, order.status);
+     * ```
+     */
+    async submitOrder(built: BuiltOrder): Promise<Order> {
+        await this.initPromise;
+        try {
+            const requestBody: SubmitOrderRequest = {
+                args: [built as any],
+                credentials: this.getCredentials()
+            };
+
+            const response = await this.api.submitOrder({
+                exchange: this.exchangeName as any,
+                submitOrderRequest: requestBody,
+            });
+
+            const data = this.handleResponse(response);
+            return convertOrder(data);
+        } catch (error) {
+            throw new Error(`Failed to submit order: ${error}`);
         }
     }
 

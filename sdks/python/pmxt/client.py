@@ -34,6 +34,7 @@ from .models import (
     UserTrade,
     PaginatedMarketsResult,
     Order,
+    BuiltOrder,
     Position,
     Balance,
     ExecutionPriceResult,
@@ -174,6 +175,17 @@ def _convert_order(raw: Dict[str, Any]) -> Order:
         timestamp=raw.get("timestamp"),
         price=raw.get("price"),
         fee=raw.get("fee"),
+    )
+
+
+def _convert_built_order(raw: Dict[str, Any]) -> BuiltOrder:
+    """Convert raw API response to BuiltOrder."""
+    return BuiltOrder(
+        exchange=raw.get("exchange", ""),
+        params=raw.get("params", {}),
+        raw=raw.get("raw"),
+        signed_order=raw.get("signedOrder"),
+        tx=raw.get("tx"),
     )
 
 
@@ -1377,6 +1389,160 @@ class Exchange(ABC):
             return _convert_order(data)
         except ApiException as e:
             raise Exception(f"Failed to create order: {self._extract_api_error(e)}") from None
+
+    def build_order(
+        self,
+        market_id: Optional[str] = None,
+        outcome_id: Optional[str] = None,
+        side: Literal["buy", "sell"] = "buy",
+        type: Literal["market", "limit"] = "market",
+        amount: float = 0,
+        price: Optional[float] = None,
+        fee: Optional[int] = None,
+        outcome: Optional[MarketOutcome] = None,
+    ) -> BuiltOrder:
+        """
+        Build an order payload without submitting it to the exchange.
+
+        Returns the exchange-native signed order or transaction payload for
+        inspection, forwarding through a middleware layer, or deferred
+        submission via submit_order().
+
+        You can specify the market either with explicit market_id/outcome_id,
+        or by passing an outcome object directly (e.g., market.yes).
+
+        Args:
+            market_id: Market ID (or use outcome instead)
+            outcome_id: Outcome ID (or use outcome instead)
+            side: Order side (buy/sell)
+            type: Order type (market/limit)
+            amount: Number of contracts
+            price: Limit price (required for limit orders, 0.0-1.0)
+            fee: Optional fee rate (e.g., 1000 for 0.1%)
+            outcome: A MarketOutcome object (e.g., market.yes). Extracts market_id and outcome_id automatically.
+
+        Returns:
+            A BuiltOrder containing the exchange-native payload
+
+        Example:
+            >>> # Build, inspect, then submit:
+            >>> built = exchange.build_order(
+            ...     market_id="663583",
+            ...     outcome_id="10991849...",
+            ...     side="buy",
+            ...     type="limit",
+            ...     amount=10,
+            ...     price=0.55
+            ... )
+            >>> print(built.signed_order)  # inspect before submitting
+            >>> order = exchange.submit_order(built)
+            >>>
+            >>> # Using outcome shorthand:
+            >>> built = exchange.build_order(
+            ...     outcome=market.yes,
+            ...     side="buy",
+            ...     type="market",
+            ...     amount=10
+            ... )
+        """
+        try:
+            # Resolve outcome shorthand
+            if outcome is not None:
+                if market_id is not None or outcome_id is not None:
+                    raise ValueError(
+                        "Cannot specify both 'outcome' and 'market_id'/'outcome_id'. Use one or the other."
+                    )
+                if not outcome.market_id:
+                    raise ValueError(
+                        "outcome.market_id is not set. Ensure the outcome comes from a fetched market."
+                    )
+                market_id = outcome.market_id
+                outcome_id = outcome.outcome_id
+            elif market_id is None or outcome_id is None:
+                raise ValueError(
+                    "Either provide 'outcome' or both 'market_id' and 'outcome_id'."
+                )
+
+            params_dict = {
+                "marketId": market_id,
+                "outcomeId": outcome_id,
+                "side": side,
+                "type": type,
+                "amount": amount,
+            }
+            if price is not None:
+                params_dict["price"] = price
+            if fee is not None:
+                params_dict["fee"] = fee
+
+            request_body_dict = {"args": [params_dict]}
+
+            # Add credentials if available
+            creds = self._get_credentials_dict()
+            if creds:
+                request_body_dict["credentials"] = creds
+
+            request_body = internal_models.BuildOrderRequest.from_dict(request_body_dict)
+
+            response = self._api.build_order(
+                exchange=self.exchange_name,
+                build_order_request=request_body,
+            )
+
+            data = self._handle_response(response.to_dict())
+            return _convert_built_order(data)
+        except ApiException as e:
+            raise Exception(f"Failed to build order: {self._extract_api_error(e)}") from None
+
+    def submit_order(self, built: BuiltOrder) -> Order:
+        """
+        Submit a pre-built order returned by build_order().
+
+        Args:
+            built: The BuiltOrder payload from build_order()
+
+        Returns:
+            The submitted order
+
+        Example:
+            >>> built = exchange.build_order(
+            ...     outcome=market.yes,
+            ...     side="buy",
+            ...     type="limit",
+            ...     amount=10,
+            ...     price=0.55
+            ... )
+            >>> order = exchange.submit_order(built)
+            >>> print(order.id, order.status)
+        """
+        try:
+            built_dict = {
+                "exchange": built.exchange,
+                "params": built.params,
+                "raw": built.raw,
+            }
+            if built.signed_order is not None:
+                built_dict["signedOrder"] = built.signed_order
+            if built.tx is not None:
+                built_dict["tx"] = built.tx
+
+            request_body_dict = {"args": [built_dict]}
+
+            creds = self._get_credentials_dict()
+            if creds:
+                request_body_dict["credentials"] = creds
+
+            request_body = internal_models.SubmitOrderRequest.from_dict(request_body_dict)
+
+            response = self._api.submit_order(
+                exchange=self.exchange_name,
+                submit_order_request=request_body,
+            )
+
+            data = self._handle_response(response.to_dict())
+            return _convert_order(data)
+        except ApiException as e:
+            raise Exception(f"Failed to submit order: {self._extract_api_error(e)}") from None
 
     def get_execution_price(
         self,
