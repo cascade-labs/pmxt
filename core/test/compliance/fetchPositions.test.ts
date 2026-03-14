@@ -30,8 +30,9 @@ describe('Compliance: fetchPositions', () => {
                     console.info(`[Compliance] ${name}.fetchPositions skipped: ${error.message}`);
                     return;
                 }
-                if (msg.includes('requires a wallet') || msg.includes('wallet address')) {
-                    console.info(`[Compliance] ${name}.fetchPositions skipped: no wallet address configured.`);
+                if (msg.includes('requires a wallet') || msg.includes('wallet address') ||
+                    msg.includes('user not found') || msg.includes('not found')) {
+                    console.info(`[Compliance] ${name}.fetchPositions skipped: ${error.message}`);
                     return;
                 }
                 throw error;

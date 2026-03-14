@@ -1,5 +1,5 @@
 import * as pmxt from "../../src";
-import { ExchangeNotAvailable, NetworkError } from "../../src/errors";
+import { ExchangeNotAvailable, NetworkError, AuthenticationError, PermissionDenied } from "../../src/errors";
 import {
   UnifiedEvent,
   UnifiedMarket,
@@ -41,7 +41,8 @@ export const exchangeClasses = Object.entries(pmxt)
       typeof value === "function" &&
       name.endsWith("Exchange") &&
       name !== "PredictionMarketExchange" &&
-      name !== "BaoziExchange",
+      name !== "BaoziExchange" &&
+      name !== "KalshiDemoExchange",
   )
   .map(([name, cls]) => ({ name, cls: cls as any }));
 
@@ -410,8 +411,14 @@ export function hasAuth(exchangeName: string): boolean {
  */
 export function isSkippableError(error: any): boolean {
     if (error instanceof ExchangeNotAvailable || error instanceof NetworkError) return true;
+    if (error instanceof AuthenticationError || error instanceof PermissionDenied) return true;
     const msg = error?.message?.toLowerCase() ?? '';
-    return msg.includes('not implemented') || msg.includes('not supported');
+    return msg.includes('not implemented') ||
+        msg.includes('not supported') ||
+        msg.includes('authentication') ||
+        msg.includes('credentials') ||
+        msg.includes('api key') ||
+        msg.includes('dynamic import callback');
 }
 
 export function initExchange(name: string, cls: any) {

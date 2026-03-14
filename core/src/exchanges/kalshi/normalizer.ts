@@ -180,21 +180,44 @@ export class KalshiNormalizer implements IExchangeNormalizer<KalshiRawEvent, Kal
     }
 
     normalizeTrade(raw: KalshiRawTrade, _index: number): Trade {
+        // Kalshi API v2 changed field names:
+        //   yes_price (cents int) → yes_price_dollars (dollar string)
+        //   count (int)           → count_fp (string)
+        const price = raw.yes_price_dollars != null
+            ? parseFloat(raw.yes_price_dollars)
+            : raw.yes_price != null
+                ? fromKalshiCents(raw.yes_price)
+                : 0;
+
+        const amount = raw.count_fp != null
+            ? parseFloat(raw.count_fp)
+            : raw.count ?? 0;
+
         return {
             id: raw.trade_id,
             timestamp: new Date(raw.created_time).getTime(),
-            price: fromKalshiCents(raw.yes_price),
-            amount: raw.count,
+            price,
+            amount,
             side: raw.taker_side === 'yes' ? 'buy' : 'sell',
         };
     }
 
     normalizeUserTrade(raw: KalshiRawFill, _index: number): UserTrade {
+        const price = raw.yes_price_dollars != null
+            ? parseFloat(raw.yes_price_dollars)
+            : raw.yes_price != null
+                ? fromKalshiCents(raw.yes_price)
+                : 0;
+
+        const amount = raw.count_fp != null
+            ? parseFloat(raw.count_fp)
+            : raw.count ?? 0;
+
         return {
             id: raw.fill_id,
             timestamp: new Date(raw.created_time).getTime(),
-            price: fromKalshiCents(raw.yes_price),
-            amount: raw.count,
+            price,
+            amount,
             side: raw.side === 'yes' ? 'buy' as const : 'sell' as const,
             orderId: raw.order_id,
         };

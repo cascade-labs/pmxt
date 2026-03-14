@@ -57,8 +57,14 @@ export interface KalshiRawOrderBookFp {
 export interface KalshiRawTrade {
     trade_id: string;
     created_time: string;
-    yes_price: number;
-    count: number;
+    /** @deprecated Old API field — new API uses yes_price_dollars */
+    yes_price?: number;
+    /** New API field: price as a dollar string e.g. "0.4540" */
+    yes_price_dollars?: string;
+    /** @deprecated Old API field — new API uses count_fp */
+    count?: number;
+    /** New API field: count as a string e.g. "424.00" */
+    count_fp?: string;
     taker_side: string;
     [key: string]: unknown;
 }
@@ -66,8 +72,12 @@ export interface KalshiRawTrade {
 export interface KalshiRawFill {
     fill_id: string;
     created_time: string;
-    yes_price: number;
-    count: number;
+    /** @deprecated Old API field */
+    yes_price?: number;
+    yes_price_dollars?: string;
+    /** @deprecated Old API field */
+    count?: number;
+    count_fp?: string;
     side: string;
     order_id: string;
     [key: string]: unknown;
