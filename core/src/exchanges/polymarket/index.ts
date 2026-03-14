@@ -29,17 +29,15 @@ import {
     UserTrade,
 } from '../../types';
 import { parseOpenApiSpec } from '../../utils/openapi';
+import { validateIdFormat, validateOutcomeId } from '../../utils/validation';
+import { FetcherContext } from '../interfaces';
 import { polymarketClobSpec } from './api-clob';
 import { polymarketDataSpec } from './api-data';
 import { polymarketGammaSpec } from './api-gamma';
 import { PolymarketAuth } from './auth';
 import { polymarketErrorMapper } from './errors';
-import { fetchEvents } from './fetchEvents';
-import { fetchMarkets } from './fetchMarkets';
-import { fetchOHLCV } from './fetchOHLCV';
-import { fetchOrderBook } from './fetchOrderBook';
-import { fetchTrades } from './fetchTrades';
-import { mapMarketToUnified } from './utils';
+import { PolymarketFetcher } from './fetcher';
+import { PolymarketNormalizer } from './normalizer';
 import { PolymarketWebSocket, PolymarketWebSocketConfig } from './websocket';
 
 // Re-export for external use
@@ -80,6 +78,8 @@ export class PolymarketExchange extends PredictionMarketExchange {
     private cachedApiCreds?: { key: string; secret: string; passphrase: string };
     private cachedAddress?: string;
     private ws?: PolymarketWebSocket;
+    private readonly fetcher: PolymarketFetcher;
+    private readonly normalizer: PolymarketNormalizer;
 
     constructor(options?: ExchangeCredentials | PolymarketExchangeOptions) {
         // Support both old signature (credentials only) and new signature (options object)
@@ -133,6 +133,16 @@ export class PolymarketExchange extends PredictionMarketExchange {
 
         const dataDescriptor = parseOpenApiSpec(polymarketDataSpec);
         this.defineImplicitApi(dataDescriptor);
+
+        // Initialize fetcher + normalizer layers
+        const ctx: FetcherContext = {
+            http: this.http,
+            callApi: this.callApi.bind(this),
+            getHeaders: () => ({}),
+        };
+
+        this.fetcher = new PolymarketFetcher(ctx, this.http);
+        this.normalizer = new PolymarketNormalizer();
     }
 
     get name(): string {
@@ -160,22 +170,37 @@ export class PolymarketExchange extends PredictionMarketExchange {
     }
 
     async fetchOHLCV(id: string, params: OHLCVParams): Promise<PriceCandle[]> {
-        return fetchOHLCV(id, params, this.callApi.bind(this));
+        validateIdFormat(id, 'OHLCV');
+        validateOutcomeId(id, 'OHLCV');
+        if (!params.resolution) {
+            throw new Error('fetchOHLCV requires a resolution parameter. Use OHLCVParams with resolution specified.');
+        }
+        const raw = await this.fetcher.fetchRawOHLCV(id, params);
+        return this.normalizer.normalizeOHLCV(raw, params);
     }
 
     async fetchOrderBook(id: string): Promise<OrderBook> {
-        return fetchOrderBook(id, this.callApi.bind(this));
+        validateIdFormat(id, 'OrderBook');
+        validateOutcomeId(id, 'OrderBook');
+        const raw = await this.fetcher.fetchRawOrderBook(id);
+        return this.normalizer.normalizeOrderBook(raw, id);
     }
 
     async fetchTrades(id: string, params: TradesParams | HistoryFilterParams): Promise<Trade[]> {
-        // Deprecation warning (also in base class, but adding here for consistency)
+        validateIdFormat(id, 'Trades');
+        validateOutcomeId(id, 'Trades');
         if ('resolution' in params && params.resolution !== undefined) {
             console.warn(
                 '[pmxt] Warning: The "resolution" parameter is deprecated for fetchTrades() and will be ignored. ' +
                 'It will be removed in v3.0.0. Please remove it from your code.',
             );
         }
-        return fetchTrades(id, params, this.callApi.bind(this));
+        const rawTrades = await this.fetcher.fetchRawTrades(id, params);
+        const mappedTrades = rawTrades.map((raw: any, i: number) => this.normalizer.normalizeTrade(raw, i));
+        if (params.limit && mappedTrades.length > params.limit) {
+            return mappedTrades.slice(0, params.limit);
+        }
+        return mappedTrades;
     }
 
     /**
@@ -360,22 +385,8 @@ export class PolymarketExchange extends PredictionMarketExchange {
     }
 
     async fetchUserTrades(address: string, params?: MyTradesParams): Promise<UserTrade[]> {
-        const queryParams: Record<string, any> = { user: address };
-        if (params?.marketId) queryParams.market = params.marketId;
-        if (params?.limit) queryParams.limit = params.limit;
-        if (params?.since) queryParams.start = Math.floor(params.since.getTime() / 1000);
-        if (params?.until) queryParams.end = Math.floor(params.until.getTime() / 1000);
-
-        const data = await this.callApi('getTrades', queryParams);
-        const trades = Array.isArray(data) ? data : (data.data || []);
-        return trades.map((t: any) => ({
-            id: t.id || t.transactionHash || String(t.timestamp),
-            timestamp: typeof t.timestamp === 'number' ? t.timestamp * 1000 : Date.now(),
-            price: parseFloat(t.price || '0'),
-            amount: parseFloat(t.size || t.amount || '0'),
-            side: t.side === 'BUY' ? 'buy' as const : t.side === 'SELL' ? 'sell' as const : 'unknown' as const,
-            orderId: t.orderId,
-        }));
+        const rawTrades = await this.fetcher.fetchRawMyTrades(params || {}, address);
+        return rawTrades.map((raw: any, i: number) => this.normalizer.normalizeUserTrade(raw, i));
     }
 
     async fetchMyTrades(params?: MyTradesParams): Promise<UserTrade[]> {
@@ -393,18 +404,8 @@ export class PolymarketExchange extends PredictionMarketExchange {
                 const auth = this.ensureAuth();
                 usrAddress = await auth.getEffectiveFunderAddress();
             }
-            const result = await this.callApi('getPositions', { user: usrAddress, limit: 100 });
-            const data = Array.isArray(result) ? result : [];
-            return data.map((p: any) => ({
-                marketId: p.conditionId,
-                outcomeId: p.asset,
-                outcomeLabel: p.outcome || 'Unknown',
-                size: parseFloat(p.size),
-                entryPrice: parseFloat(p.avgPrice),
-                currentPrice: parseFloat(p.curPrice || '0'),
-                unrealizedPnL: parseFloat(p.cashPnl || '0'),
-                realizedPnL: parseFloat(p.realizedPnl || '0'),
-            }));
+            const rawPositions = await this.fetcher.fetchRawPositions(usrAddress);
+            return rawPositions.map((raw: any) => this.normalizer.normalizePosition(raw));
         } catch (error: any) {
             throw polymarketErrorMapper.mapError(error);
         }
@@ -550,37 +551,61 @@ export class PolymarketExchange extends PredictionMarketExchange {
     // ----------------------------------------------------------------------------
 
     protected async fetchMarketsImpl(params?: MarketFilterParams): Promise<UnifiedMarket[]> {
-        return fetchMarkets(params, this.http);
+        const rawEvents = await this.fetcher.fetchRawMarkets(params);
+
+        const unifiedMarkets: UnifiedMarket[] = [];
+        const useQuestionFallback = !!(params?.marketId || params?.slug || params?.eventId);
+
+        for (const event of rawEvents) {
+            const markets = this.normalizer.normalizeMarketsFromEvent(event, { useQuestionAsCandidateFallback: useQuestionFallback });
+            unifiedMarkets.push(...markets);
+        }
+
+        // For outcomeId filtering (no direct API, fetch and filter)
+        if (params?.outcomeId) {
+            return unifiedMarkets.filter(m =>
+                m.outcomes.some(o => o.outcomeId === params.outcomeId),
+            );
+        }
+
+        // For query-based search, apply client-side filtering on market title
+        if (params?.query) {
+            const lowerQuery = params.query.toLowerCase();
+            const searchIn = params?.searchIn || 'title';
+            const filtered = unifiedMarkets.filter(m => {
+                const titleMatch = (m.title || '').toLowerCase().includes(lowerQuery);
+                const descMatch = (m.description || '').toLowerCase().includes(lowerQuery);
+                if (searchIn === 'title') return titleMatch;
+                if (searchIn === 'description') return descMatch;
+                return titleMatch || descMatch;
+            });
+            return filtered.slice(0, params?.limit || 250000);
+        }
+
+        // Client-side sort for default/non-search paths
+        if (params?.sort === 'volume') {
+            unifiedMarkets.sort((a, b) => b.volume24h - a.volume24h);
+        } else if (params?.sort === 'liquidity') {
+            unifiedMarkets.sort((a, b) => b.liquidity - a.liquidity);
+        } else if (!params?.marketId && !params?.slug && !params?.eventId) {
+            unifiedMarkets.sort((a, b) => b.volume24h - a.volume24h);
+        }
+
+        return unifiedMarkets.slice(0, params?.limit || 250000);
     }
 
     protected async fetchEventsImpl(params: EventFetchParams): Promise<UnifiedEvent[]> {
         if (params.eventId || params.slug) {
+            // Use implicit API for eventId/slug lookup (listEvents)
             const queryParams = params.eventId ? { id: params.eventId } : { slug: params.slug };
             const events = await this.callApi('listEvents', queryParams);
-            return (events || []).map((event: any) => {
-                const markets: UnifiedMarket[] = [];
-                if (event.markets && Array.isArray(event.markets)) {
-                    for (const market of event.markets) {
-                        const unified = mapMarketToUnified(event, market, { useQuestionAsCandidateFallback: true });
-                        if (unified) markets.push(unified);
-                    }
-                }
-                return {
-                    id: event.id || event.slug,
-                    title: event.title,
-                    description: event.description || '',
-                    slug: event.slug,
-                    markets,
-                    volume24h: markets.reduce((sum, m) => sum + m.volume24h, 0),
-                    volume: markets.some(m => m.volume !== undefined) ? markets.reduce((sum, m) => sum + (m.volume ?? 0), 0) : undefined,
-                    url: `https://polymarket.com/event/${event.slug}`,
-                    image: event.image || `https://polymarket.com/api/og?slug=${event.slug}`,
-                    category: event.category || event.tags?.[0]?.label,
-                    tags: event.tags?.map((t: any) => t.label) || [],
-                } as UnifiedEvent;
-            });
+            return (events || []).map((event: any) => this.normalizer.normalizeEvent(event)).filter((e: UnifiedEvent | null): e is UnifiedEvent => e !== null);
         }
-        return fetchEvents(params, this.http);
+        const rawEvents = await this.fetcher.fetchRawEvents(params);
+        return rawEvents
+            .map((raw) => this.normalizer.normalizeEvent(raw))
+            .filter((e): e is UnifiedEvent => e !== null)
+            .slice(0, params.limit || 10000);
     }
 
     /**
