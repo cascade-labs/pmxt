@@ -561,6 +561,7 @@ export class LimitlessExchange extends PredictionMarketExchange {
             const wsConfig = {
                 ...this.wsConfig,
                 apiKey: this.auth?.getApiKey(),
+                fetchOrderBook: (id: string) => this.fetchOrderBook(id),
             };
             this.ws = new LimitlessWebSocket(this.callApi.bind(this), wsConfig);
         }

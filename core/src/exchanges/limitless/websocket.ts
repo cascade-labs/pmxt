@@ -7,8 +7,6 @@ import {
 } from "../../subscriber/external/goldsky";
 import { AddressWatcher, WatcherConfig } from "../../subscriber/watcher";
 import { OrderBook, Trade } from '../../types';
-import { fetchOrderBook } from './fetchOrderBook';
-
 // Limitless uses USDC with 6 decimals
 const USDC_DECIMALS = 6;
 const USDC_SCALE = Math.pow(10, USDC_DECIMALS);
@@ -29,6 +27,8 @@ export interface LimitlessWebSocketConfig extends Partial<WebSocketConfig> {
     reconnectDelay?: number;
     /** Watcher subscription configurations */
     watcherConfig?: WatcherConfig;
+    /** Callback to fetch an orderbook snapshot via REST (used as fallback) */
+    fetchOrderBook?: (id: string) => Promise<OrderBook>;
 }
 
 /**
@@ -44,6 +44,7 @@ export class LimitlessWebSocket {
     private readonly watcher: AddressWatcher;
     private config: LimitlessWebSocketConfig;
     private callApi: (operationId: string, params?: Record<string, any>) => Promise<any>;
+    private readonly fetchOrderBookSnapshot: (id: string) => Promise<OrderBook>;
     private orderbookCallbacks: Map<string, (orderbook: OrderBook) => void> = new Map();
     private priceCallbacks: Map<string, (data: any) => void> = new Map();
     private orderbookResolvers: Map<string, Array<{
@@ -56,6 +57,7 @@ export class LimitlessWebSocket {
     constructor(callApi: (operationId: string, params?: Record<string, any>) => Promise<any>, config: LimitlessWebSocketConfig = {}) {
         this.callApi = callApi;
         this.config = config;
+        this.fetchOrderBookSnapshot = config.fetchOrderBook ?? (async () => this.getEmptyOrderbook());
 
         // Initialize SDK WebSocket client
         const wsConfig: WebSocketConfig = {
@@ -122,7 +124,7 @@ export class LimitlessWebSocket {
         if (!this.lastOrderbookTimestamps.has(marketSlug)) {
             this.lastOrderbookTimestamps.set(marketSlug, Date.now());
             try {
-                return await fetchOrderBook(marketSlug, this.callApi);
+                return await this.fetchOrderBookSnapshot(marketSlug);
             } catch (err) {
                 console.warn(`[LimitlessWS] Failed to fetch initial snapshot:`, err);
             }
@@ -141,7 +143,7 @@ export class LimitlessWebSocket {
         if (timeSinceLastUpdate > SNAPSHOT_REFRESH_INTERVAL) {
             this.lastOrderbookTimestamps.set(marketSlug, Date.now());
             try {
-                return await fetchOrderBook(marketSlug, this.callApi);
+                return await this.fetchOrderBookSnapshot(marketSlug);
             } catch (err) {
                 console.warn(`[LimitlessWS] Failed to fetch refresh snapshot:`, err);
             }
@@ -161,7 +163,7 @@ export class LimitlessWebSocket {
                     // Timeout: fetch REST snapshot as fallback
                     try {
                         this.lastOrderbookTimestamps.set(marketSlug, Date.now());
-                        const snapshot = await fetchOrderBook(marketSlug, this.callApi);
+                        const snapshot = await this.fetchOrderBookSnapshot(marketSlug);
                         resolve(snapshot);
                     } catch (err) {
                         console.warn(`[LimitlessWS] Failed to fetch timeout fallback snapshot:`, err);
