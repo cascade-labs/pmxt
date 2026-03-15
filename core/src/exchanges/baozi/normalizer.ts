@@ -97,7 +97,7 @@ export class BaoziNormalizer implements IExchangeNormalizer<BaoziRawMarket, Baoz
         }
 
         const outcome = market.outcomes.find(o => o.outcomeId === outcomeId);
-        const price = outcome?.price ?? 0.5;
+        const price = outcome?.price ?? 0;
         const totalLiquidity = market.liquidity;
 
         return {

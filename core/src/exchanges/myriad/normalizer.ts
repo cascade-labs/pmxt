@@ -131,7 +131,7 @@ export class MyriadNormalizer implements IExchangeNormalizer<MyriadRawMarket, My
             return { bids: [], asks: [], timestamp: Date.now() };
         }
 
-        const price = Number(outcome.price) || 0.5;
+        const price = Number(outcome.price) || 0;
         const liquidity = Number(raw.liquidity || 0);
         const size = liquidity > 0 ? liquidity : 1;
 

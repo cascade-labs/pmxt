@@ -26,7 +26,7 @@ export class KalshiNormalizer implements IExchangeNormalizer<KalshiRawEvent, Kal
     normalizeRawMarket(event: KalshiRawEvent, market: KalshiRawMarket): UnifiedMarket | null {
         if (!market) return null;
 
-        let price = 0.5;
+        let price = 0;
         if (market.last_price) {
             price = fromKalshiCents(market.last_price);
         } else if (market.yes_ask && market.yes_bid) {
