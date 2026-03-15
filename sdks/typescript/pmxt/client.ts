@@ -43,6 +43,7 @@ import {
 
 import { ServerManager } from "./server-manager.js";
 import { buildArgsWithOptionalOptions } from "./args.js";
+import { PmxtError, fromServerError } from "./errors.js";
 
 // Converter functions
 function convertMarket(raw: any): UnifiedMarket {
@@ -289,7 +290,7 @@ export abstract class Exchange {
                 });
                 this.api = new DefaultApi(this.config);
             } catch (error) {
-                throw new Error(
+                throw new PmxtError(
                     `Failed to start PMXT server: ${error}\n\n` +
                     `Please ensure 'pmxt-core' is installed: npm install -g pmxt-core\n` +
                     `Or start the server manually: pmxt-server`
@@ -301,7 +302,10 @@ export abstract class Exchange {
     protected handleResponse(response: any): any {
         if (!response.success) {
             const error = response.error || {};
-            throw new Error(error.message || "Unknown error");
+            if (error && typeof error === "object" && (error.code || error.message)) {
+                throw fromServerError(error);
+            }
+            throw new PmxtError(error.message || "Unknown error");
         }
         return response.data;
     }
@@ -364,14 +368,18 @@ export abstract class Exchange {
             });
 
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
 
             const json = await response.json();
             return this.handleResponse(json);
         } catch (error) {
-            throw new Error(`Failed to call API '${operationId}': ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to call API '${operationId}': ${error}`);
         }
     }
 
@@ -388,8 +396,11 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
@@ -399,7 +410,8 @@ export abstract class Exchange {
             }
             return result;
         } catch (error) {
-            throw new Error(`Failed to loadMarkets: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to loadMarkets: ${error}`);
         }
     }
 
@@ -413,14 +425,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return data.map(convertMarket);
         } catch (error) {
-            throw new Error(`Failed to fetchMarkets: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchMarkets: ${error}`);
         }
     }
 
@@ -434,8 +450,11 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
@@ -445,7 +464,8 @@ export abstract class Exchange {
                 nextCursor: data.nextCursor,
             };
         } catch (error) {
-            throw new Error(`Failed to fetchMarketsPaginated: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchMarketsPaginated: ${error}`);
         }
     }
 
@@ -459,14 +479,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return data.map(convertEvent);
         } catch (error) {
-            throw new Error(`Failed to fetchEvents: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchEvents: ${error}`);
         }
     }
 
@@ -480,14 +504,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return convertMarket(data);
         } catch (error) {
-            throw new Error(`Failed to fetchMarket: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchMarket: ${error}`);
         }
     }
 
@@ -501,14 +529,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return convertEvent(data);
         } catch (error) {
-            throw new Error(`Failed to fetchEvent: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchEvent: ${error}`);
         }
     }
 
@@ -523,14 +555,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return convertOrderBook(data);
         } catch (error) {
-            throw new Error(`Failed to fetchOrderBook: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchOrderBook: ${error}`);
         }
     }
 
@@ -546,14 +582,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return convertOrder(data);
         } catch (error) {
-            throw new Error(`Failed to cancelOrder: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to cancelOrder: ${error}`);
         }
     }
 
@@ -568,14 +608,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return convertOrder(data);
         } catch (error) {
-            throw new Error(`Failed to fetchOrder: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchOrder: ${error}`);
         }
     }
 
@@ -589,14 +633,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return data.map(convertOrder);
         } catch (error) {
-            throw new Error(`Failed to fetchOpenOrders: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchOpenOrders: ${error}`);
         }
     }
 
@@ -610,14 +658,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return data.map(convertUserTrade);
         } catch (error) {
-            throw new Error(`Failed to fetchMyTrades: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchMyTrades: ${error}`);
         }
     }
 
@@ -631,14 +683,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return data.map(convertOrder);
         } catch (error) {
-            throw new Error(`Failed to fetchClosedOrders: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchClosedOrders: ${error}`);
         }
     }
 
@@ -652,14 +708,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return data.map(convertOrder);
         } catch (error) {
-            throw new Error(`Failed to fetchAllOrders: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchAllOrders: ${error}`);
         }
     }
 
@@ -673,14 +733,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return data.map(convertPosition);
         } catch (error) {
-            throw new Error(`Failed to fetchPositions: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchPositions: ${error}`);
         }
     }
 
@@ -694,14 +758,18 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             const data = this.handleResponse(json);
             return data.map(convertBalance);
         } catch (error) {
-            throw new Error(`Failed to fetchBalance: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetchBalance: ${error}`);
         }
     }
 
@@ -715,13 +783,17 @@ export abstract class Exchange {
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
             const json = await response.json();
             this.handleResponse(json);
         } catch (error) {
-            throw new Error(`Failed to close: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to close: ${error}`);
         }
     }
 
@@ -774,7 +846,8 @@ export abstract class Exchange {
             const data = this.handleResponse(response);
             return data.map(convertCandle);
         } catch (error) {
-            throw new Error(`Failed to fetch OHLCV: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetch OHLCV: ${error}`);
         }
     }
 
@@ -811,7 +884,8 @@ export abstract class Exchange {
             const data = this.handleResponse(response);
             return data.map(convertTrade);
         } catch (error) {
-            throw new Error(`Failed to fetch trades: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to fetch trades: ${error}`);
         }
     }
 
@@ -858,7 +932,8 @@ export abstract class Exchange {
             const data = this.handleResponse(response);
             return convertOrderBook(data);
         } catch (error) {
-            throw new Error(`Failed to watch order book: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to watch order book: ${error}`);
         }
     }
 
@@ -917,7 +992,8 @@ export abstract class Exchange {
             const data = this.handleResponse(response);
             return data.map(convertTrade);
         } catch (error) {
-            throw new Error(`Failed to watch trades: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to watch trades: ${error}`);
         }
     }
 
@@ -965,7 +1041,8 @@ export abstract class Exchange {
             const data = this.handleResponse(response);
             return convertSubscriptionSnapshot(data);
         } catch (error) {
-            throw new Error(`Failed to watch address: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to watch address: ${error}`);
         }
     }
 
@@ -994,7 +1071,8 @@ export abstract class Exchange {
 
             return this.handleResponse(response);
         } catch (error) {
-            throw new Error(`Failed to unwatch address: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to unwatch address: ${error}`);
         }
     }
 
@@ -1044,13 +1122,13 @@ export abstract class Exchange {
 
             if (params.outcome) {
                 if (marketId !== undefined || outcomeId !== undefined) {
-                    throw new Error(
+                    throw new PmxtError(
                         "Cannot specify both 'outcome' and 'marketId'/'outcomeId'. Use one or the other."
                     );
                 }
                 const outcome: MarketOutcome = params.outcome;
                 if (!outcome.marketId) {
-                    throw new Error(
+                    throw new PmxtError(
                         "outcome.marketId is not set. Ensure the outcome comes from a fetched market."
                     );
                 }
@@ -1085,7 +1163,8 @@ export abstract class Exchange {
             const data = this.handleResponse(response);
             return data as BuiltOrder;
         } catch (error) {
-            throw new Error(`Failed to build order: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to build order: ${error}`);
         }
     }
 
@@ -1124,7 +1203,8 @@ export abstract class Exchange {
             const data = this.handleResponse(response);
             return convertOrder(data);
         } catch (error) {
-            throw new Error(`Failed to submit order: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to submit order: ${error}`);
         }
     }
 
@@ -1155,13 +1235,13 @@ export abstract class Exchange {
 
             if (params.outcome) {
                 if (marketId !== undefined || outcomeId !== undefined) {
-                    throw new Error(
+                    throw new PmxtError(
                         "Cannot specify both 'outcome' and 'marketId'/'outcomeId'. Use one or the other."
                     );
                 }
                 const outcome: MarketOutcome = params.outcome;
                 if (!outcome.marketId) {
-                    throw new Error(
+                    throw new PmxtError(
                         "outcome.marketId is not set. Ensure the outcome comes from a fetched market."
                     );
                 }
@@ -1196,7 +1276,8 @@ export abstract class Exchange {
             const data = this.handleResponse(response);
             return convertOrder(data);
         } catch (error) {
-            throw new Error(`Failed to create order: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to create order: ${error}`);
         }
     }
 
@@ -1250,14 +1331,18 @@ export abstract class Exchange {
             });
 
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || response.statusText);
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
             }
 
             const json = await response.json();
             return this.handleResponse(json);
         } catch (error) {
-            throw new Error(`Failed to get execution price: ${error}`);
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to get execution price: ${error}`);
         }
     }
 
