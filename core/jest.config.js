@@ -9,5 +9,5 @@ module.exports = {
   transformIgnorePatterns: [
     "node_modules/(?!(@polymarket|ethers|@ethersproject|axios|@prob|ky|viem|ox)/)"
   ],
-  testPathIgnorePatterns: ["/node_modules/", "/dist/"],
+  testPathIgnorePatterns: ["/node_modules/", "/dist/", "\\.claude/worktrees/agent-"],
 };

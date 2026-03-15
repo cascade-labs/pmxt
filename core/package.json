@@ -66,11 +66,13 @@
     "@types/cors": "^2.8.19",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.0.3",
+    "@types/supertest": "^7.2.0",
     "@types/ws": "^8.5.10",
     "esbuild": "^0.24.2",
     "handlebars": "^4.7.8",
     "identity-obj-proxy": "^3.0.0",
     "js-yaml": "^3.14.2",
+    "supertest": "^7.2.2",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3"
   },
