@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.21.1] - 2026-03-19
+
+### Added
+
+- **Zenodo DOI Integration**: Zenodo now automatically creates a DOI for each release, enabling reliable academic citation.
+
 ## [2.21.0] - 2026-03-15
 
 ### Added
