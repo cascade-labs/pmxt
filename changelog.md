@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.21.2] - 2026-03-20
+
+### Fixed
+
+- **Polymarket Per-Market Images**: Multi-market events (e.g. FIFA World Cup, Presidential Nominee) now correctly use each market's own image instead of the parent event image. Image precedence is now `market.image` > `event.image` > OG fallback.
+
 ## [2.21.1] - 2026-03-19
 
 ### Added
