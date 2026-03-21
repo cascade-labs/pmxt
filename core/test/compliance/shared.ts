@@ -376,6 +376,7 @@ export function getMockCredentials() {
  * - Limitless: LIMITLESS_PRIVATE_KEY, LIMITLESS_API_KEY
  * - Myriad: MYRIAD_PROD or MYRIAD_STAGING
  * - Baozi: BAOZI_PRIVATE_KEY
+ * - Opinion: OPINION_API_KEY
  */
 export function hasAuth(exchangeName: string): boolean {
   const polyPk = process.env.POLYMARKET_PRIVATE_KEY?.trim();
@@ -401,6 +402,10 @@ export function hasAuth(exchangeName: string): boolean {
   }
   if (exchangeName === "BaoziExchange") {
     return !!baoziPk && baoziPk.length > 10;
+  }
+  if (exchangeName === "OpinionExchange") {
+    const opinionKey = process.env.OPINION_API_KEY?.trim();
+    return !!opinionKey && opinionKey.length > 5;
   }
   return false;
 }
@@ -448,6 +453,14 @@ export function initExchange(name: string, cls: any) {
   }
   if (name === "BaoziExchange") {
     return new cls({ privateKey: process.env.BAOZI_PRIVATE_KEY?.trim() });
+  }
+  if (name === "OpinionExchange") {
+    return new cls({
+        credentials: {
+            apiKey: process.env.OPINION_API_KEY?.trim(),
+        },
+        walletAddress: process.env.OPINION_WALLET_ADDRESS?.trim(),
+    });
   }
   return new cls();
 }
