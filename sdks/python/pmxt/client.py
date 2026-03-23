@@ -622,9 +622,6 @@ class Exchange(ABC):
             data = self._handle_response(json.loads(response.data))
             return _convert_order_book(data)
         except Exception as e:
-            from pmxt.errors import OrderNotFound
-            if isinstance(e, OrderNotFound):
-                return OrderBook(bids=[], asks=[])
             raise self._parse_api_exception(e) from None
 
     def cancel_order(self, order_id: str) -> Order:
