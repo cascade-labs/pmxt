@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.22.2] - 2026-04-02
+
+### Fixed
+
+- **MarketOutcome Shorthand Consistency**: `fetchOrderBook`, `fetchOHLCV`, `fetchTrades`, `watchOrderBook`, and `watchTrades` now accept a `MarketOutcome` object directly (e.g. `market.yes`) in both Python and TypeScript SDKs, matching the existing behavior of `createOrder` and `buildOrder`.
+
 ## [2.22.1] - 2026-03-23
 
 ### Fixed
