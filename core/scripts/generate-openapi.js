@@ -786,7 +786,7 @@ function buildSpec(methodSpecs) {
           name: 'exchange',
           schema: {
             type: 'string',
-            enum: ['polymarket', 'kalshi', 'limitless', 'probable', 'baozi', 'myriad', 'opinion'],
+            enum: ['polymarket', 'kalshi', 'limitless', 'probable', 'baozi', 'myriad', 'opinion', 'metaculus', 'smarkets'],
           },
           required: true,
           description: 'The prediction market exchange to target.',

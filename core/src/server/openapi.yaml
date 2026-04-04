@@ -1145,6 +1145,7 @@ components:
           - myriad
           - opinion
           - metaculus
+          - smarkets
       required: true
       description: The prediction market exchange to target.
   schemas:

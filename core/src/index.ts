@@ -12,6 +12,7 @@ export * from './exchanges/baozi';
 export * from './exchanges/myriad';
 export * from './exchanges/opinion';
 export * from './exchanges/metaculus';
+export * from './exchanges/smarkets';
 export * from './server/app';
 export * from './server/utils/port-manager';
 export * from './server/utils/lock-file';
@@ -25,6 +26,7 @@ import { BaoziExchange } from './exchanges/baozi';
 import { MyriadExchange } from './exchanges/myriad';
 import { OpinionExchange } from './exchanges/opinion';
 import { MetaculusExchange } from './exchanges/metaculus';
+import { SmarketsExchange } from './exchanges/smarkets';
 
 const pmxt = {
     Polymarket: PolymarketExchange,
@@ -36,6 +38,7 @@ const pmxt = {
     Myriad: MyriadExchange,
     Opinion: OpinionExchange,
     Metaculus: MetaculusExchange,
+    Smarkets: SmarketsExchange,
 };
 
 export const Polymarket = PolymarketExchange;
@@ -47,5 +50,6 @@ export const Baozi = BaoziExchange;
 export const Myriad = MyriadExchange;
 export const Opinion = OpinionExchange;
 export const Metaculus = MetaculusExchange;
+export const Smarkets = SmarketsExchange;
 
 export default pmxt;

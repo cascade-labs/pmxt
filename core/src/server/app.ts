@@ -9,6 +9,7 @@ import { BaoziExchange } from "../exchanges/baozi";
 import { MyriadExchange } from "../exchanges/myriad";
 import { OpinionExchange } from "../exchanges/opinion";
 import { MetaculusExchange } from "../exchanges/metaculus";
+import { SmarketsExchange } from "../exchanges/smarkets";
 import { ExchangeCredentials } from "../BaseExchange";
 import { BaseError } from "../errors";
 
@@ -23,6 +24,7 @@ const defaultExchanges: Record<string, any> = {
   myriad: null,
   opinion: null,
   metaculus: null,
+  smarkets: null,
 };
 
 export async function startServer(port: number, accessToken: string) {
@@ -227,6 +229,12 @@ function createExchange(name: string, credentials?: ExchangeCredentials) {
       return new MetaculusExchange({
         apiToken:
           credentials?.apiToken || process.env.METACULUS_API_TOKEN,
+      });
+    case "smarkets":
+      return new SmarketsExchange({
+        apiKey: credentials?.apiKey || process.env.SMARKETS_EMAIL,
+        privateKey:
+          credentials?.privateKey || process.env.SMARKETS_PASSWORD,
       });
     default:
       throw new Error(`Unknown exchange: ${name}`);
