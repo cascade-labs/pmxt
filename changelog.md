@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.23.0] - 2026-04-04
+
+### Added
+
+- **Metaculus Exchange Integration**: Full support for the Metaculus reputation-based forecasting platform. Browse questions, community predictions, and tournament structures via `fetchMarkets` and `fetchEvents`. Submit probability forecasts via `createOrder` (binary and multiple-choice questions) and withdraw them via `cancelOrder`. Group-of-questions posts are automatically expanded into individual sub-question markets. Token-based authentication via `{ apiToken: "..." }`.
+- **Python SDK: Token Auth**: `Exchange` base class and `Metaculus` subclass now accept `api_token` for token-based authentication, with credential forwarding to the sidecar server.
+- **Python SDK: Unit Tests**: Comprehensive unit test suite for the Python client wrapper (`test_client.py`, `conftest.py`) covering market fetching, order creation, filtering, error handling, and credential forwarding.
+
+### Fixed
+
+- **Probable Auth: viem Type Mismatch**: Resolved `WalletClient` type disagreement when `@prob/clob` resolves a different viem copy than the host package.
+
+### Changed
+
+- **TypeScript SDK**: Bumped `ts-jest` to `^29.4.9`.
+
 ## [2.22.2] - 2026-04-02
 
 ### Fixed
