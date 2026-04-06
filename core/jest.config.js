@@ -7,7 +7,7 @@ module.exports = {
     '^.+\\.jsx?$': 'ts-jest',
   },
   transformIgnorePatterns: [
-    "node_modules/(?!(@polymarket|@opinion-labs|ethers|@ethersproject|axios|@prob|ky|viem|ox)/)"
+    "node_modules/(?!(@polymarket|@opinion-labs|ethers|@ethersproject|axios|@prob|ky|viem|ox|polymarket-us|@noble)/)"
   ],
   moduleNameMapper: {
     '^@opinion-labs/opinion-clob-sdk$': '<rootDir>/../node_modules/@opinion-labs/opinion-clob-sdk/dist/index.js',

@@ -13,6 +13,7 @@ export * from './exchanges/myriad';
 export * from './exchanges/opinion';
 export * from './exchanges/metaculus';
 export * from './exchanges/smarkets';
+export * from './exchanges/polymarket_us';
 export * from './server/app';
 export * from './server/utils/port-manager';
 export * from './server/utils/lock-file';
@@ -27,6 +28,7 @@ import { MyriadExchange } from './exchanges/myriad';
 import { OpinionExchange } from './exchanges/opinion';
 import { MetaculusExchange } from './exchanges/metaculus';
 import { SmarketsExchange } from './exchanges/smarkets';
+import { PolymarketUSExchange } from './exchanges/polymarket_us';
 
 const pmxt = {
     Polymarket: PolymarketExchange,
@@ -39,6 +41,7 @@ const pmxt = {
     Opinion: OpinionExchange,
     Metaculus: MetaculusExchange,
     Smarkets: SmarketsExchange,
+    PolymarketUS: PolymarketUSExchange,
 };
 
 export const Polymarket = PolymarketExchange;
@@ -51,5 +54,6 @@ export const Myriad = MyriadExchange;
 export const Opinion = OpinionExchange;
 export const Metaculus = MetaculusExchange;
 export const Smarkets = SmarketsExchange;
+export const PolymarketUS = PolymarketUSExchange;
 
 export default pmxt;

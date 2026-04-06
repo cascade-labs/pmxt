@@ -10,6 +10,7 @@ import { MyriadExchange } from "../exchanges/myriad";
 import { OpinionExchange } from "../exchanges/opinion";
 import { MetaculusExchange } from "../exchanges/metaculus";
 import { SmarketsExchange } from "../exchanges/smarkets";
+import { PolymarketUSExchange } from "../exchanges/polymarket_us";
 import { ExchangeCredentials } from "../BaseExchange";
 import { BaseError } from "../errors";
 
@@ -240,6 +241,12 @@ function createExchange(name: string, credentials?: ExchangeCredentials) {
         apiKey: credentials?.apiKey || process.env.SMARKETS_EMAIL,
         privateKey:
           credentials?.privateKey || process.env.SMARKETS_PASSWORD,
+      });
+    case "polymarket_us":
+      return new PolymarketUSExchange({
+        apiKey: credentials?.apiKey || process.env.POLYMARKET_US_KEY_ID,
+        privateKey:
+          credentials?.privateKey || process.env.POLYMARKET_US_SECRET_KEY,
       });
     default:
       throw new Error(`Unknown exchange: ${name}`);
