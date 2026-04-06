@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.24.0] - 2026-04-06
+
+### Added
+
+- **Smarkets Exchange Integration**: Full support for the Smarkets betting exchange with session-based authentication. Browse leaf events and markets via `fetchEvents` and `fetchMarkets`, query order books, place and cancel orders, and read balances. Includes correct array parameter serialization for the Smarkets API and `type_scope=single_event` filtering for leaf events. Comes with unit tests covering price conversion, auth, normalizer, and error translation.
+
+### Fixed
+
+- **Polymarket: Silent Zero Balance**: `fetchBalance` now catches the bundled `@polymarket/clob-client` `TypeError` thrown when `getOpenOrders` spreads an HTTP error envelope and translates it to a clear `AuthenticationError` with onboarding guidance. Also validates `getBalanceAllowance` shape so a swallowed error envelope no longer produces `NaN` and disables the on-chain fallback.
+- **Polymarket: Proxy Discovery**: `auth.getClobClient` now runs `discoverProxy` whenever `signatureType` is missing (even if `funderAddress` is set), ignores the synthetic EOA fallback from failed discovery, and defaults to `gnosissafe` (2) when the funder differs from the signer EOA. Fixes silent zero balances for modern Polymarket accounts. Closes #72.
+- **Polymarket: Env Configuration**: `server/app.ts` now reads `POLYMARKET_FUNDER_ADDRESS` / `POLYMARKET_PROXY_ADDRESS` and `POLYMARKET_SIGNATURE_TYPE` from the environment so SDK users can configure them without code changes.
+
 ## [2.23.0] - 2026-04-04
 
 ### Added
