@@ -24,7 +24,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
-    "build": "tsc",
+    "build": "tsc && cp src/server/openapi.yaml dist/server/openapi.yaml",
     "bundle:server": "npm run build && esbuild dist/server/index.js --bundle --platform=node --target=node18 --outfile=dist/server/bundled.js --external:fsevents --external:@opinion-labs/opinion-clob-sdk",
     "test": "jest -c jest.config.js",
     "server": "tsx watch src/server/index.ts",

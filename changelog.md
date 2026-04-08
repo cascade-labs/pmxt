@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.26.2] - 2026-04-08
+
+### Added
+
+- **`openapi.yaml` now ships in the published `pmxt-core` tarball** at `dist/server/openapi.yaml`. Previously the spec was generated into `core/src/server/openapi.yaml` and consumed in-repo (by the SDK generators and the openapi drift check) but was excluded from the npm package because only `dist/`, `bin/`, and `API_REFERENCE.md` were in the `files` field. Downstream consumers of `pmxt-core` can now read the spec directly from `node_modules/pmxt-core/dist/server/openapi.yaml` — no git clone, no version-pinned GitHub raw fetch, no drift between the installed package and the spec. Enables documentation sites (Mintlify, Redocly, Stoplight) and type generators to sit on top of the installed package and stay automatically in lockstep with whichever pmxt-core version is pinned.
+
+  Mechanically: `build` now does `tsc && cp src/server/openapi.yaml dist/server/openapi.yaml`. The existing `dist` entry in `files` means it's included in `npm publish` without touching the `files` array. Verified with `npm pack --dry-run` — `dist/server/openapi.yaml` (52 kB) is in the tarball.
+
 ## [2.26.1] - 2026-04-08
 
 ### Changed
