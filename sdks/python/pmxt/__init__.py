@@ -17,7 +17,7 @@ Example:
 """
 
 from .client import Exchange
-from ._exchanges import Polymarket, Limitless, Kalshi, KalshiDemo, Probable, Baozi, Myriad, Opinion, Metaculus
+from ._exchanges import Polymarket, Limitless, Kalshi, KalshiDemo, Probable, Baozi, Myriad, Opinion, Metaculus, Smarkets, PolymarketUS
 from .server_manager import ServerManager
 from .errors import (
     PmxtError,
@@ -80,6 +80,8 @@ __all__ = [
     "Myriad",
     "Opinion",
     "Metaculus",
+    "Smarkets",
+    "PolymarketUS",
     "Exchange",
     # Server Management
     "ServerManager",

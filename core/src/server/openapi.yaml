@@ -1139,6 +1139,7 @@ components:
         enum:
           - polymarket
           - kalshi
+          - kalshi-demo
           - limitless
           - probable
           - baozi
@@ -1146,6 +1147,7 @@ components:
           - opinion
           - metaculus
           - smarkets
+          - polymarket_us
       required: true
       description: The prediction market exchange to target.
   schemas:

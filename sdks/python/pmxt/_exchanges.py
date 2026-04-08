@@ -305,3 +305,59 @@ class Metaculus(Exchange):
             base_url=base_url,
             auto_start_server=auto_start_server,
         )
+
+
+class Smarkets(Exchange):
+    """Smarkets exchange client."""
+
+    def __init__(
+        self,
+        email: Optional[str] = None,
+        password: Optional[str] = None,
+        base_url: str = "http://localhost:3847",
+        auto_start_server: bool = True,
+    ):
+        """
+        Initialize Smarkets client.
+
+        Args:
+            email: Smarkets account email (optional; required for trading)
+            password: Smarkets account password (optional; required for trading)
+            base_url: Base URL of the PMXT sidecar server
+            auto_start_server: Automatically start server if not running (default: True)
+        """
+        super().__init__(
+            exchange_name="smarkets",
+            api_key=email,
+            private_key=password,
+            base_url=base_url,
+            auto_start_server=auto_start_server,
+        )
+
+
+class PolymarketUS(Exchange):
+    """Polymarket US exchange client."""
+
+    def __init__(
+        self,
+        key_id: Optional[str] = None,
+        secret_key: Optional[str] = None,
+        base_url: str = "http://localhost:3847",
+        auto_start_server: bool = True,
+    ):
+        """
+        Initialize Polymarket US client.
+
+        Args:
+            key_id: Polymarket US API key id (optional; required for trading)
+            secret_key: Polymarket US API secret key (optional; required for trading)
+            base_url: Base URL of the PMXT sidecar server
+            auto_start_server: Automatically start server if not running (default: True)
+        """
+        super().__init__(
+            exchange_name="polymarket_us",
+            api_key=key_id,
+            private_key=secret_key,
+            base_url=base_url,
+            auto_start_server=auto_start_server,
+        )

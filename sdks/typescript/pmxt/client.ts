@@ -1835,3 +1835,77 @@ export class Baozi extends Exchange {
         super("baozi", options);
     }
 }
+
+/**
+ * Opinion exchange client.
+ *
+ * Polygon-based CLOB exchange. Public catalog endpoints work without
+ * credentials; trading requires `apiKey` (proxy address) and `privateKey`.
+ *
+ * @example
+ * ```typescript
+ * const opinion = new Opinion();
+ * const events = await opinion.fetchEvents();
+ * ```
+ */
+export class Opinion extends Exchange {
+    constructor(options: ExchangeOptions = {}) {
+        super("opinion", options);
+    }
+}
+
+/**
+ * Metaculus exchange client.
+ *
+ * Forecasting platform. Public read-only access works without credentials;
+ * authenticated calls accept a bearer token via `apiKey`.
+ *
+ * @example
+ * ```typescript
+ * const metaculus = new Metaculus();
+ * const events = await metaculus.fetchEvents();
+ * ```
+ */
+export class Metaculus extends Exchange {
+    constructor(options: ExchangeOptions = {}) {
+        super("metaculus", options);
+    }
+}
+
+/**
+ * Smarkets exchange client.
+ *
+ * UK-based betting exchange. Public catalog endpoints work without
+ * credentials; trading requires Smarkets account email (`apiKey`) and
+ * password (`privateKey`).
+ *
+ * @example
+ * ```typescript
+ * const smarkets = new Smarkets();
+ * const events = await smarkets.fetchEvents();
+ * ```
+ */
+export class Smarkets extends Exchange {
+    constructor(options: ExchangeOptions = {}) {
+        super("smarkets", options);
+    }
+}
+
+/**
+ * Polymarket US exchange client.
+ *
+ * US-regulated Polymarket venue. Public catalog endpoints work without
+ * credentials; trading requires `apiKey` (keyId) and `privateKey`
+ * (secretKey) issued by Polymarket US.
+ *
+ * @example
+ * ```typescript
+ * const polyUs = new PolymarketUS();
+ * const events = await polyUs.fetchEvents();
+ * ```
+ */
+export class PolymarketUS extends Exchange {
+    constructor(options: ExchangeOptions = {}) {
+        super("polymarket_us", options);
+    }
+}
