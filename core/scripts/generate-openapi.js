@@ -13,6 +13,14 @@ const yaml = require('js-yaml');
 
 const BASE_EXCHANGE_PATH = path.join(__dirname, '../src/BaseExchange.ts');
 const OPENAPI_OUT_PATH = path.join(__dirname, '../src/server/openapi.yaml');
+// Sidecar metadata consumed by the runtime server (app.ts) so the GET
+// handler knows which methods are safe to expose as GET and how to
+// translate query parameters into the positional `args` array that
+// exchange methods expect.
+const METHOD_VERBS_OUT_PATH = path.join(
+    __dirname,
+    '../src/server/method-verbs.json'
+);
 
 const EXCLUDED_METHODS = new Set(['callApi', 'defineImplicitApi']);
 
@@ -240,12 +248,165 @@ function isPublicMethod(node) {
 }
 
 // ---------------------------------------------------------------------------
+// Verb classification + per-parameter metadata
+//
+// Methods whose name starts with `fetch` are exposed as **GET** on the
+// HTTP surface (idempotent, cacheable, browser-native). Everything else —
+// writes (`createOrder`, `cancelOrder`, ...), loaders (`loadMarkets`),
+// lifecycle (`close`), realtime (`watch*`, `unwatch*`), and in-memory
+// utilities (`filterMarkets`, `getExecutionPrice*`) — stays as **POST**
+// because they either mutate state, carry credentials in the body, or
+// take structural arguments that don't fit cleanly in a query string.
+//
+// A method is GET-eligible if its signature fits the shape
+// `[primitive..., object?]`: any number of primitive args (routed by
+// name in the query string), optionally followed by a single object arg
+// whose remaining properties also travel as query params. The server's
+// `queryToArgs` reserves primitive arg names and spreads everything
+// else into the object slot, so this shape round-trips cleanly. Methods
+// with more than one object arg, or with unknown parameter kinds, stay
+// POST.
+// ---------------------------------------------------------------------------
+
+function paramKind(typeNode) {
+  if (!typeNode) return 'unknown';
+  switch (typeNode.kind) {
+    case ts.SyntaxKind.StringKeyword:
+      return 'string';
+    case ts.SyntaxKind.NumberKeyword:
+      return 'number';
+    case ts.SyntaxKind.BooleanKeyword:
+      return 'boolean';
+    case ts.SyntaxKind.TypeReference:
+    case ts.SyntaxKind.TypeLiteral:
+      return 'object';
+    case ts.SyntaxKind.UnionType: {
+      // Allow unions of named object types as object-kind (fetchTrades
+      // takes `TradesParams | HistoryFilterParams`, etc.). Reject other
+      // unions as unknown so we fall back to POST.
+      const members = typeNode.types.filter(
+        t =>
+          t.kind !== ts.SyntaxKind.NullKeyword &&
+          t.kind !== ts.SyntaxKind.UndefinedKeyword
+      );
+      if (members.every(t => t.kind === ts.SyntaxKind.TypeReference)) {
+        return 'object';
+      }
+      return 'unknown';
+    }
+    default:
+      return 'unknown';
+  }
+}
+
+function paramTypeName(typeNode) {
+  if (!typeNode) return null;
+  if (typeNode.kind === ts.SyntaxKind.TypeReference) {
+    const tn = typeNode.typeName;
+    return tn.kind === ts.SyntaxKind.Identifier ? tn.text : tn.right.text;
+  }
+  if (typeNode.kind === ts.SyntaxKind.UnionType) {
+    // Pick the first named type in a union for property enumeration.
+    for (const t of typeNode.types) {
+      if (t.kind === ts.SyntaxKind.TypeReference) {
+        const tn = t.typeName;
+        return tn.kind === ts.SyntaxKind.Identifier ? tn.text : tn.right.text;
+      }
+    }
+  }
+  return null;
+}
+
+function extractParamMeta(method) {
+  return method.parameters.map(p => {
+    const name =
+      p.name && p.name.kind === ts.SyntaxKind.Identifier ? p.name.text : 'arg';
+    const optional = !!p.questionToken || !!p.initializer;
+    const kind = paramKind(p.type);
+    const typeName = paramTypeName(p.type);
+    return { name, optional, kind, typeName };
+  });
+}
+
+function classifyVerb(methodName, paramsMeta) {
+  if (!methodName.startsWith('fetch')) return 'post';
+  if (paramsMeta.length === 0) return 'get';
+  // Reject unknown kinds outright — we can't safely serialise them.
+  const isPrimitive = k =>
+    k === 'string' || k === 'number' || k === 'boolean';
+  if (!paramsMeta.every(p => isPrimitive(p.kind) || p.kind === 'object')) {
+    return 'post';
+  }
+  // At most one object arg. `queryToArgs` reserves primitive arg names
+  // and spreads the rest of the query string into the object slot, so
+  // `(id: string, params: object)` shapes round-trip cleanly.
+  const objectCount = paramsMeta.filter(p => p.kind === 'object').length;
+  if (objectCount > 1) return 'post';
+  return 'get';
+}
+
+// Expand an object-typed parameter into a list of query parameter
+// definitions. We look up the named type in our static SCHEMAS map; for
+// inline type literals we walk the AST members directly.
+function expandObjectParamToQuery(param, methodParam, sourceFile) {
+  const queryParams = [];
+
+  // Named type — enumerate from SCHEMAS
+  if (param.typeName) {
+    const schemaName = TYPE_REF_MAP[param.typeName] || param.typeName;
+    const schema = SCHEMAS[schemaName];
+    if (schema && schema.properties) {
+      for (const [propName, propSchema] of Object.entries(schema.properties)) {
+        const qp = {
+          in: 'query',
+          name: propName,
+          required: false,
+          schema: propSchema,
+        };
+        if (propSchema.description) qp.description = propSchema.description;
+        queryParams.push(qp);
+      }
+      return queryParams;
+    }
+  }
+
+  // Inline object type — walk the TypeLiteral members
+  if (
+    methodParam.type &&
+    methodParam.type.kind === ts.SyntaxKind.TypeLiteral
+  ) {
+    for (const member of methodParam.type.members) {
+      if (
+        member.kind !== ts.SyntaxKind.PropertySignature ||
+        !member.name ||
+        member.name.kind !== ts.SyntaxKind.Identifier
+      ) {
+        continue;
+      }
+      const propSchema = typeNodeToSchema(member.type, sourceFile) || {
+        type: 'string',
+      };
+      queryParams.push({
+        in: 'query',
+        name: member.name.text,
+        required: !member.questionToken,
+        schema: propSchema,
+      });
+    }
+  }
+
+  return queryParams;
+}
+
+// ---------------------------------------------------------------------------
 // Build a single OpenAPI path entry from a MethodDeclaration node
 // ---------------------------------------------------------------------------
 
 function buildPathSpec(method, sourceFile) {
   const name = method.name.text;
   const params = method.parameters;
+  const paramsMeta = extractParamMeta(method);
+  const verb = classifyVerb(name, paramsMeta);
 
   let requiredCount = 0;
   for (const p of params) {
@@ -253,7 +414,72 @@ function buildPathSpec(method, sourceFile) {
   }
   const totalCount = params.length;
 
-  // Build the args array schema
+  // Build the response schema from the return type
+  const returnSchema = method.type ? typeNodeToSchema(method.type, sourceFile) : null;
+
+  let responseSchema;
+  if (returnSchema === null) {
+    responseSchema = { $ref: '#/components/schemas/BaseResponse' };
+  } else {
+    responseSchema = {
+      allOf: [
+        { $ref: '#/components/schemas/BaseResponse' },
+        { type: 'object', properties: { data: returnSchema } },
+      ],
+    };
+  }
+
+  const description = getJSDocDescription(method, sourceFile);
+  const summary = camelToTitle(name);
+
+  // ---- GET: query-parameter shape, no request body ----------------------
+  if (verb === 'get') {
+    const parameters = [{ $ref: '#/components/parameters/ExchangeParam' }];
+
+    if (paramsMeta.length === 1 && paramsMeta[0].kind === 'object') {
+      // Expand the single object param's properties as flat query params
+      parameters.push(
+        ...expandObjectParamToQuery(paramsMeta[0], params[0], sourceFile)
+      );
+    } else {
+      for (let i = 0; i < paramsMeta.length; i++) {
+        const pm = paramsMeta[i];
+        parameters.push({
+          in: 'query',
+          name: pm.name,
+          required: !pm.optional,
+          schema: {
+            type:
+              pm.kind === 'number'
+                ? 'number'
+                : pm.kind === 'boolean'
+                ? 'boolean'
+                : 'string',
+          },
+        });
+      }
+    }
+
+    const pathObj = {
+      get: {
+        summary,
+        operationId: name,
+        parameters,
+        responses: {
+          '200': {
+            description: `${summary} response`,
+            content: {
+              'application/json': { schema: responseSchema },
+            },
+          },
+        },
+      },
+    };
+    if (description) pathObj.get.description = description;
+    return { name, pathObj, verb, paramsMeta };
+  }
+
+  // ---- POST: existing args/credentials request-body shape ---------------
   let argsSchema;
   if (totalCount === 0) {
     argsSchema = { type: 'array', maxItems: 0, items: {} };
@@ -272,22 +498,6 @@ function buildPathSpec(method, sourceFile) {
     };
   }
 
-  // Build the response schema from the return type
-  const returnSchema = method.type ? typeNodeToSchema(method.type, sourceFile) : null;
-
-  let responseSchema;
-  if (returnSchema === null) {
-    // void — just reference BaseResponse
-    responseSchema = { $ref: '#/components/schemas/BaseResponse' };
-  } else {
-    responseSchema = {
-      allOf: [
-        { $ref: '#/components/schemas/BaseResponse' },
-        { type: 'object', properties: { data: returnSchema } },
-      ],
-    };
-  }
-
   const requestBodySchema = {
     title: name.charAt(0).toUpperCase() + name.slice(1) + 'Request',
     type: 'object',
@@ -299,9 +509,6 @@ function buildPathSpec(method, sourceFile) {
   if (requiredCount > 0) {
     requestBodySchema.required = ['args'];
   }
-
-  const description = getJSDocDescription(method, sourceFile);
-  const summary = camelToTitle(name);
 
   const pathObj = {
     post: {
@@ -328,7 +535,7 @@ function buildPathSpec(method, sourceFile) {
     pathObj.post.description = description;
   }
 
-  return { name, pathObj };
+  return { name, pathObj, verb, paramsMeta };
 }
 
 // ---------------------------------------------------------------------------
@@ -818,6 +1025,31 @@ function buildSpec(methodSpecs) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Runtime sidecar: method name → verb + arg spec
+//
+// The generated OpenAPI spec is the public contract, but app.ts needs
+// a lean, O(1)-lookup form of the same info to drive its GET dispatch
+// at runtime. We emit it as plain JSON (no yaml parser required in the
+// server) next to openapi.yaml, so `npm run build` copies both into
+// dist/server/ in a single `cp` line.
+// ---------------------------------------------------------------------------
+
+function buildMethodVerbs(methodSpecs) {
+  const out = {};
+  for (const { name, verb, paramsMeta } of methodSpecs) {
+    out[name] = {
+      verb,
+      args: paramsMeta.map(p => ({
+        name: p.name,
+        kind: p.kind,
+        optional: p.optional,
+      })),
+    };
+  }
+  return out;
+}
+
 function main() {
   const source = fs.readFileSync(BASE_EXCHANGE_PATH, 'utf-8');
   const sourceFile = ts.createSourceFile(
@@ -839,9 +1071,25 @@ function main() {
 
   fs.writeFileSync(OPENAPI_OUT_PATH, yamlStr, 'utf-8');
   console.log(`Generated ${path.relative(process.cwd(), OPENAPI_OUT_PATH)}`);
-  console.log(`  ${methodSpecs.length} endpoints extracted from BaseExchange.ts:`);
-  for (const { name } of methodSpecs) {
-    console.log(`  - ${name}`);
+
+  const methodVerbs = buildMethodVerbs(methodSpecs);
+  fs.writeFileSync(
+    METHOD_VERBS_OUT_PATH,
+    JSON.stringify(methodVerbs, null, 2) + '\n',
+    'utf-8'
+  );
+  console.log(
+    `Generated ${path.relative(process.cwd(), METHOD_VERBS_OUT_PATH)}`
+  );
+
+  const getCount = methodSpecs.filter(s => s.verb === 'get').length;
+  const postCount = methodSpecs.length - getCount;
+  console.log(
+    `  ${methodSpecs.length} endpoints extracted from BaseExchange.ts ` +
+      `(${getCount} GET, ${postCount} POST):`
+  );
+  for (const { name, verb } of methodSpecs) {
+    console.log(`  - ${verb.toUpperCase().padEnd(4)} ${name}`);
   }
 }
 
