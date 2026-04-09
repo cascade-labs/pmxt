@@ -51,38 +51,73 @@ function isServerRunning() {
 }
 
 /**
- * Wait for server to respond to health check
+ * Read the current lock file contents, if any.
  */
-function waitForHealth(port, timeout = HEALTH_CHECK_TIMEOUT) {
-    return new Promise((resolve, reject) => {
-        const startTime = Date.now();
+function readLockData() {
+    try {
+        if (!fs.existsSync(LOCK_FILE)) {
+            return null;
+        }
+        return JSON.parse(fs.readFileSync(LOCK_FILE, 'utf-8'));
+    } catch (err) {
+        return null;
+    }
+}
 
-        const checkHealth = () => {
-            const req = http.get(`http://localhost:${port}/health`, (res) => {
-                if (res.statusCode === 200) {
-                    resolve(true);
-                } else {
-                    scheduleNextCheck();
-                }
-            });
+/**
+ * Check a single health probe against the given port.
+ */
+function probeHealth(port) {
+    return new Promise((resolve) => {
+        const req = http.get(`http://localhost:${port}/health`, (res) => {
+            res.resume();
+            resolve(res.statusCode === 200);
+        });
 
-            req.on('error', () => {
-                scheduleNextCheck();
-            });
+        req.on('error', () => {
+            resolve(false);
+        });
 
-            req.setTimeout(1000);
-        };
-
-        const scheduleNextCheck = () => {
-            if (Date.now() - startTime > timeout) {
-                reject(new Error('Server health check timeout'));
-            } else {
-                setTimeout(checkHealth, HEALTH_CHECK_INTERVAL);
-            }
-        };
-
-        checkHealth();
+        req.setTimeout(1000, () => {
+            req.destroy();
+            resolve(false);
+        });
     });
+}
+
+/**
+ * Wait for server to respond to health check on a specific port.
+ */
+async function waitForHealth(port, timeout = HEALTH_CHECK_TIMEOUT) {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime <= timeout) {
+        if (await probeHealth(port)) {
+            return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, HEALTH_CHECK_INTERVAL));
+    }
+
+    throw new Error('Server health check timeout');
+}
+
+/**
+ * Wait for server health using the actual port written into server.lock.
+ */
+async function waitForHealthFromLock(timeout = HEALTH_CHECK_TIMEOUT) {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime <= timeout) {
+        const lockData = readLockData();
+        if (lockData && Number.isInteger(lockData.port)) {
+            if (await probeHealth(lockData.port)) {
+                return lockData.port;
+            }
+        }
+        await new Promise((resolve) => setTimeout(resolve, HEALTH_CHECK_INTERVAL));
+    }
+
+    throw new Error('Server health check timeout');
 }
 
 /**
@@ -136,8 +171,8 @@ async function startServer() {
     // Detach from parent process
     serverProcess.unref();
 
-    // Wait for server to be ready
-    await waitForHealth(DEFAULT_PORT);
+    // Wait for server to be ready on the actual port chosen at runtime
+    await waitForHealthFromLock();
 }
 
 /**

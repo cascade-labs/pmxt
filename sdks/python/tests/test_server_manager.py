@@ -1,6 +1,8 @@
 import unittest
+import json
 from unittest.mock import patch, MagicMock
 from pathlib import Path
+import tempfile
 import os
 import shutil
 from pmxt.server_manager import ServerManager
@@ -80,6 +82,32 @@ class TestServerManagerCrossPlatform(unittest.TestCase):
         launcher_js = core_bin / 'pmxt-ensure-server.js'
         self.assertTrue(launcher_js.exists(), "pmxt-ensure-server.js should exist in core/bin")
         self.assertTrue(os.access(launcher_js, os.X_OK), "pmxt-ensure-server.js should be executable")
+
+    def test_wait_for_health_uses_lock_file_port(self):
+        """
+        Verify startup health checks follow the actual port written to server.lock,
+        not just the default port.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manager = ServerManager()
+            manager.lock_path = Path(tmpdir) / 'server.lock'
+            manager.lock_path.write_text(json.dumps({
+                'pid': 123,
+                'port': 3848,
+                'timestamp': 0,
+            }))
+
+            calls = []
+
+            def fake_check_health(port, timeout=2):
+                calls.append((port, timeout))
+                return port == 3848
+
+            with patch.object(manager, '_check_health', side_effect=fake_check_health):
+                manager._wait_for_health()
+
+            self.assertTrue(calls)
+            self.assertEqual(calls[0][0], 3848)
 
 if __name__ == '__main__':
     unittest.main()

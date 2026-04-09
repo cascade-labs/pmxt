@@ -402,20 +402,23 @@ class ServerManager:
     def _wait_for_health(self) -> None:
         """
         Wait for the server to respond to health checks.
-        
-        Universal pattern: Poll /health endpoint until it responds or timeout.
+
+        Uses the actual port from the lock file when available so startup
+        still succeeds if the default port was busy and the sidecar moved to
+        the next available port.
         """
         start_time = time.time()
-        
+
         while time.time() - start_time < self.HEALTH_CHECK_TIMEOUT:
             try:
-                if self._check_health(self._port):
+                port = self.get_running_port()
+                if self._check_health(port):
                     return
-            except:
+            except Exception:
                 pass
-            
+
             time.sleep(self.HEALTH_CHECK_INTERVAL)
-        
+
         raise Exception(
             f"Server failed to become healthy within {self.HEALTH_CHECK_TIMEOUT}s"
         )
