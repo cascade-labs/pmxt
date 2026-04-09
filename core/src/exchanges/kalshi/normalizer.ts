@@ -335,7 +335,10 @@ export class KalshiNormalizer implements IExchangeNormalizer<KalshiRawEvent, Kal
     private templateRule(rule: string, candidateName: string | null): string {
         if (!candidateName) return rule;
         const escaped = candidateName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const matcher = new RegExp(`\\b${escaped}\\b`, 'g');
+        // Unicode-aware word boundaries so non-ASCII candidate names (Jose,
+        // Muller, O'Brien, etc.) still template correctly. JavaScript's \b is
+        // ASCII-only and would silently fail on such names.
+        const matcher = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'gu');
         const replaced = rule.replace(matcher, '{x}');
         return replaced === rule ? rule : replaced;
     }
