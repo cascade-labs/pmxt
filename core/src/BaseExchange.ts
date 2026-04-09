@@ -70,6 +70,9 @@ export interface EventFetchParams {
     slug?: string;       // Lookup by event slug
 }
 
+/**
+ * Deprecated - use OHLCVParams or TradesParams instead. Resolution is optional for backward compatibility.
+ */
 export interface HistoryFilterParams {
     resolution?: CandleInterval; // Optional for backward compatibility
     start?: Date;
@@ -84,6 +87,9 @@ export interface OHLCVParams {
     limit?: number;
 }
 
+/**
+ * Parameters for fetching trade history. No resolution parameter - trades are discrete events.
+ */
 export interface TradesParams {
     // No resolution - trades are discrete events, not aggregated
     start?: Date;
@@ -195,6 +201,9 @@ export interface ExchangeHas {
     submitOrder: ExchangeCapability;
 }
 
+/**
+ * Optional authentication credentials for exchange operations.
+ */
 export interface ExchangeCredentials {
     // Standard API authentication (Kalshi, etc.)
     apiKey?: string;

@@ -77,13 +77,12 @@ paths:
           name: limit
           required: false
           schema:
-            type: integer
-            default: 10000
+            type: number
         - in: query
           name: offset
           required: false
           schema:
-            type: integer
+            type: number
         - in: query
           name: sort
           required: false
@@ -100,10 +99,10 @@ paths:
             type: string
             enum:
               - active
+              - inactive
               - closed
               - all
-            description: 'Filter by market status (default: active)'
-          description: 'Filter by market status (default: active)'
+          description: 'Filter by market status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
         - in: query
           name: searchIn
           required: false
@@ -113,47 +112,49 @@ paths:
               - title
               - description
               - both
+          description: 'Where to search (default: ''title'')'
         - in: query
           name: query
           required: false
           schema:
             type: string
+          description: For keyword search
         - in: query
           name: slug
           required: false
           schema:
             type: string
+          description: For slug/ticker lookup
         - in: query
           name: marketId
           required: false
           schema:
             type: string
-            description: Direct lookup by market ID
           description: Direct lookup by market ID
         - in: query
           name: outcomeId
           required: false
           schema:
             type: string
-            description: Reverse lookup -- find market containing this outcome
           description: Reverse lookup -- find market containing this outcome
         - in: query
           name: eventId
           required: false
           schema:
             type: string
-            description: Find markets belonging to an event
           description: Find markets belonging to an event
         - in: query
           name: page
           required: false
           schema:
-            type: integer
+            type: number
+          description: For pagination (used by Limitless)
         - in: query
           name: similarityThreshold
           required: false
           schema:
             type: number
+          description: For semantic search (used by Limitless)
       responses:
         '200':
           description: Fetch Markets response
@@ -216,6 +217,17 @@ paths:
           required: false
           schema:
             type: string
+          description: For keyword search
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: number
         - in: query
           name: sort
           required: false
@@ -226,27 +238,16 @@ paths:
               - liquidity
               - newest
         - in: query
-          name: limit
-          required: false
-          schema:
-            type: integer
-            default: 10000
-        - in: query
-          name: offset
-          required: false
-          schema:
-            type: integer
-        - in: query
           name: status
           required: false
           schema:
             type: string
             enum:
               - active
+              - inactive
               - closed
               - all
-            description: 'Filter by event status (default: active)'
-          description: 'Filter by event status (default: active)'
+          description: 'Filter by event status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
         - in: query
           name: searchIn
           required: false
@@ -261,14 +262,12 @@ paths:
           required: false
           schema:
             type: string
-            description: Direct lookup by event ID
           description: Direct lookup by event ID
         - in: query
           name: slug
           required: false
           schema:
             type: string
-            description: Lookup by event slug
           description: Lookup by event slug
       responses:
         '200':
@@ -297,13 +296,12 @@ paths:
           name: limit
           required: false
           schema:
-            type: integer
-            default: 10000
+            type: number
         - in: query
           name: offset
           required: false
           schema:
-            type: integer
+            type: number
         - in: query
           name: sort
           required: false
@@ -320,10 +318,10 @@ paths:
             type: string
             enum:
               - active
+              - inactive
               - closed
               - all
-            description: 'Filter by market status (default: active)'
-          description: 'Filter by market status (default: active)'
+          description: 'Filter by market status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
         - in: query
           name: searchIn
           required: false
@@ -333,47 +331,49 @@ paths:
               - title
               - description
               - both
+          description: 'Where to search (default: ''title'')'
         - in: query
           name: query
           required: false
           schema:
             type: string
+          description: For keyword search
         - in: query
           name: slug
           required: false
           schema:
             type: string
+          description: For slug/ticker lookup
         - in: query
           name: marketId
           required: false
           schema:
             type: string
-            description: Direct lookup by market ID
           description: Direct lookup by market ID
         - in: query
           name: outcomeId
           required: false
           schema:
             type: string
-            description: Reverse lookup -- find market containing this outcome
           description: Reverse lookup -- find market containing this outcome
         - in: query
           name: eventId
           required: false
           schema:
             type: string
-            description: Find markets belonging to an event
           description: Find markets belonging to an event
         - in: query
           name: page
           required: false
           schema:
-            type: integer
+            type: number
+          description: For pagination (used by Limitless)
         - in: query
           name: similarityThreshold
           required: false
           schema:
             type: number
+          description: For semantic search (used by Limitless)
       responses:
         '200':
           description: Fetch Market response
@@ -400,6 +400,17 @@ paths:
           required: false
           schema:
             type: string
+          description: For keyword search
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: number
         - in: query
           name: sort
           required: false
@@ -410,27 +421,16 @@ paths:
               - liquidity
               - newest
         - in: query
-          name: limit
-          required: false
-          schema:
-            type: integer
-            default: 10000
-        - in: query
-          name: offset
-          required: false
-          schema:
-            type: integer
-        - in: query
           name: status
           required: false
           schema:
             type: string
             enum:
               - active
+              - inactive
               - closed
               - all
-            description: 'Filter by event status (default: active)'
-          description: 'Filter by event status (default: active)'
+          description: 'Filter by event status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
         - in: query
           name: searchIn
           required: false
@@ -445,14 +445,12 @@ paths:
           required: false
           schema:
             type: string
-            description: Direct lookup by event ID
           description: Direct lookup by event ID
         - in: query
           name: slug
           required: false
           schema:
             type: string
-            description: Lookup by event slug
           description: Lookup by event slug
       responses:
         '200':
@@ -492,8 +490,7 @@ paths:
               - 1h
               - 6h
               - 1d
-            description: Candle interval for aggregation
-          description: Candle interval for aggregation
+          description: Required for candle aggregation
         - in: query
           name: start
           required: false
@@ -510,7 +507,7 @@ paths:
           name: limit
           required: false
           schema:
-            type: integer
+            type: number
       responses:
         '200':
           description: Fetch O H L C V response
@@ -579,7 +576,7 @@ paths:
           name: limit
           required: false
           schema:
-            type: integer
+            type: number
       responses:
         '200':
           description: Fetch Trades response
@@ -802,15 +799,13 @@ paths:
           required: false
           schema:
             type: string
-            description: Filter to specific outcome/ticker
-          description: Filter to specific outcome/ticker
+          description: filter to specific outcome/ticker
         - in: query
           name: marketId
           required: false
           schema:
             type: string
-            description: Filter to specific market
-          description: Filter to specific market
+          description: filter to specific market
         - in: query
           name: since
           required: false
@@ -827,14 +822,13 @@ paths:
           name: limit
           required: false
           schema:
-            type: integer
+            type: number
         - in: query
           name: cursor
           required: false
           schema:
             type: string
-            description: For Kalshi cursor pagination
-          description: For Kalshi cursor pagination
+          description: for Kalshi cursor pagination
       responses:
         '200':
           description: Fetch My Trades response
@@ -860,8 +854,7 @@ paths:
           required: false
           schema:
             type: string
-            description: Required for Limitless (slug)
-          description: Required for Limitless (slug)
+          description: required for Limitless (slug)
         - in: query
           name: since
           required: false
@@ -878,7 +871,7 @@ paths:
           name: limit
           required: false
           schema:
-            type: integer
+            type: number
         - in: query
           name: cursor
           required: false
@@ -909,8 +902,7 @@ paths:
           required: false
           schema:
             type: string
-            description: Required for Limitless (slug)
-          description: Required for Limitless (slug)
+          description: required for Limitless (slug)
         - in: query
           name: since
           required: false
@@ -927,7 +919,7 @@ paths:
           name: limit
           required: false
           schema:
-            type: integer
+            type: number
         - in: query
           name: cursor
           required: false
@@ -1110,6 +1102,94 @@ paths:
                       - oneOf:
                           - type: string
                           - type: object
+                            properties:
+                              text:
+                                type: string
+                              searchIn:
+                                type: array
+                                items:
+                                  type: string
+                                  enum:
+                                    - title
+                                    - description
+                                    - category
+                                    - tags
+                                    - outcomes
+                              volume24h:
+                                type: object
+                                properties:
+                                  min:
+                                    type: number
+                                  max:
+                                    type: number
+                              volume:
+                                type: object
+                                properties:
+                                  min:
+                                    type: number
+                                  max:
+                                    type: number
+                              liquidity:
+                                type: object
+                                properties:
+                                  min:
+                                    type: number
+                                  max:
+                                    type: number
+                              openInterest:
+                                type: object
+                                properties:
+                                  min:
+                                    type: number
+                                  max:
+                                    type: number
+                              resolutionDate:
+                                type: object
+                                properties:
+                                  before:
+                                    type: string
+                                    format: date-time
+                                  after:
+                                    type: string
+                                    format: date-time
+                              category:
+                                type: string
+                              tags:
+                                type: array
+                                items:
+                                  type: string
+                              price:
+                                type: object
+                                properties:
+                                  outcome:
+                                    type: string
+                                    enum:
+                                      - 'yes'
+                                      - 'no'
+                                      - up
+                                      - down
+                                  min:
+                                    type: number
+                                  max:
+                                    type: number
+                                required:
+                                  - outcome
+                              priceChange24h:
+                                type: object
+                                properties:
+                                  outcome:
+                                    type: string
+                                    enum:
+                                      - 'yes'
+                                      - 'no'
+                                      - up
+                                      - down
+                                  min:
+                                    type: number
+                                  max:
+                                    type: number
+                                required:
+                                  - outcome
                           - type: object
                 credentials:
                   $ref: '#/components/schemas/ExchangeCredentials'
@@ -1157,6 +1237,38 @@ paths:
                       - oneOf:
                           - type: string
                           - type: object
+                            properties:
+                              text:
+                                type: string
+                              searchIn:
+                                type: array
+                                items:
+                                  type: string
+                                  enum:
+                                    - title
+                                    - description
+                                    - category
+                                    - tags
+                              category:
+                                type: string
+                              tags:
+                                type: array
+                                items:
+                                  type: string
+                              marketCount:
+                                type: object
+                                properties:
+                                  min:
+                                    type: number
+                                  max:
+                                    type: number
+                              totalVolume:
+                                type: object
+                                properties:
+                                  min:
+                                    type: number
+                                  max:
+                                    type: number
                           - type: object
                 credentials:
                   $ref: '#/components/schemas/ExchangeCredentials'
@@ -1420,6 +1532,9 @@ components:
         marketId:
           type: string
           description: The unique identifier for this market
+        eventId:
+          type: string
+          description: Link to parent event
         title:
           type: string
         description:
@@ -1430,9 +1545,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketOutcome'
-        eventId:
-          type: string
-          description: Link to parent event
         resolutionDate:
           type: string
           format: date-time
@@ -1440,6 +1552,7 @@ components:
           type: number
         volume:
           type: number
+          description: Total / Lifetime volume
         liquidity:
           type: number
         openInterest:
@@ -1471,6 +1584,15 @@ components:
           $ref: '#/components/schemas/MarketOutcome'
         down:
           $ref: '#/components/schemas/MarketOutcome'
+      required:
+        - marketId
+        - title
+        - description
+        - outcomes
+        - resolutionDate
+        - volume24h
+        - liquidity
+        - url
     MarketOutcome:
       type: object
       properties:
@@ -1479,7 +1601,7 @@ components:
           description: 'Outcome ID for trading operations (CLOB Token ID for Polymarket, Market Ticker for Kalshi)'
         marketId:
           type: string
-          description: The market this outcome belongs to (set automatically)
+          description: The market this outcome belongs to (set automatically when outcomes are built)
         label:
           type: string
         price:
@@ -1488,11 +1610,15 @@ components:
           type: number
         metadata:
           type: object
-          additionalProperties: true
+          additionalProperties: {}
           description: 'Exchange-specific metadata (e.g., clobTokenId for Polymarket)'
+      required:
+        - outcomeId
+        - label
+        - price
     UnifiedEvent:
       type: object
-      description: 'A grouped collection of related markets (e.g., "Who will be Fed Chair?" contains multiple candidate markets)'
+      description: 'A grouped collection of related markets (e.g., "Who will be Fed Chair?" contains multiple candidate markets).'
       properties:
         id:
           type: string
@@ -1521,11 +1647,19 @@ components:
           type: array
           items:
             type: string
+      required:
+        - id
+        - title
+        - description
+        - slug
+        - markets
+        - volume24h
+        - url
     PriceCandle:
       type: object
       properties:
         timestamp:
-          type: integer
+          type: number
         open:
           type: number
         high:
@@ -1536,6 +1670,12 @@ components:
           type: number
         volume:
           type: number
+      required:
+        - timestamp
+        - open
+        - high
+        - low
+        - close
     OrderBook:
       type: object
       properties:
@@ -1548,19 +1688,29 @@ components:
           items:
             $ref: '#/components/schemas/OrderLevel'
         timestamp:
-          type: integer
+          type: number
+      required:
+        - bids
+        - asks
     OrderLevel:
       type: object
       properties:
         price:
           type: number
+          description: 0.0 to 1.0 (probability)
         size:
           type: number
+          description: contracts/shares
+      required:
+        - price
+        - size
     Trade:
       type: object
       properties:
         id:
           type: string
+        timestamp:
+          type: number
         price:
           type: number
         amount:
@@ -1571,13 +1721,21 @@ components:
             - buy
             - sell
             - unknown
-        timestamp:
-          type: integer
+        outcomeId:
+          type: string
+      required:
+        - id
+        - timestamp
+        - price
+        - amount
+        - side
     UserTrade:
       type: object
       properties:
         id:
           type: string
+        timestamp:
+          type: number
         price:
           type: number
         amount:
@@ -1588,14 +1746,16 @@ components:
             - buy
             - sell
             - unknown
-        timestamp:
-          type: integer
-        orderId:
-          type: string
         outcomeId:
           type: string
-        marketId:
+        orderId:
           type: string
+      required:
+        - id
+        - timestamp
+        - price
+        - amount
+        - side
     Order:
       type: object
       properties:
@@ -1613,12 +1773,14 @@ components:
         type:
           type: string
           enum:
-            - limit
             - market
+            - limit
         price:
           type: number
+          description: For limit orders
         amount:
           type: number
+          description: Size in contracts/shares
         status:
           type: string
           enum:
@@ -1629,12 +1791,25 @@ components:
             - rejected
         filled:
           type: number
+          description: Amount filled
         remaining:
           type: number
+          description: Amount remaining
         timestamp:
-          type: integer
+          type: number
         fee:
           type: number
+      required:
+        - id
+        - marketId
+        - outcomeId
+        - side
+        - type
+        - amount
+        - status
+        - filled
+        - remaining
+        - timestamp
     Position:
       type: object
       properties:
@@ -1646,6 +1821,7 @@ components:
           type: string
         size:
           type: number
+          description: 'Positive for long, negative for short'
         entryPrice:
           type: number
         currentPrice:
@@ -1654,17 +1830,32 @@ components:
           type: number
         realizedPnL:
           type: number
+      required:
+        - marketId
+        - outcomeId
+        - outcomeLabel
+        - size
+        - entryPrice
+        - currentPrice
+        - unrealizedPnL
     Balance:
       type: object
       properties:
         currency:
           type: string
+          description: 'e.g., ''USDC'''
         total:
           type: number
         available:
           type: number
         locked:
           type: number
+          description: In open orders
+      required:
+        - currency
+        - total
+        - available
+        - locked
     ExecutionPriceResult:
       type: object
       properties:
@@ -1674,25 +1865,32 @@ components:
           type: number
         fullyFilled:
           type: boolean
+      required:
+        - price
+        - filledAmount
+        - fullyFilled
     PaginatedMarketsResult:
       type: object
+      description: Shape returned by fetchMarketsPaginated
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/UnifiedMarket'
         total:
-          type: integer
+          type: number
         nextCursor:
           type: string
+      required:
+        - data
+        - total
     MarketFilterParams:
       type: object
       properties:
         limit:
-          type: integer
-          default: 10000
+          type: number
         offset:
-          type: integer
+          type: number
         sort:
           type: string
           enum:
@@ -1703,19 +1901,23 @@ components:
           type: string
           enum:
             - active
+            - inactive
             - closed
             - all
-          description: 'Filter by market status (default: active)'
+          description: 'Filter by market status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
         searchIn:
           type: string
           enum:
             - title
             - description
             - both
+          description: 'Where to search (default: ''title'')'
         query:
           type: string
+          description: For keyword search
         slug:
           type: string
+          description: For slug/ticker lookup
         marketId:
           type: string
           description: Direct lookup by market ID
@@ -1726,32 +1928,35 @@ components:
           type: string
           description: Find markets belonging to an event
         page:
-          type: integer
+          type: number
+          description: For pagination (used by Limitless)
         similarityThreshold:
           type: number
+          description: For semantic search (used by Limitless)
     EventFetchParams:
       type: object
       properties:
         query:
           type: string
+          description: For keyword search
+        limit:
+          type: number
+        offset:
+          type: number
         sort:
           type: string
           enum:
             - volume
             - liquidity
             - newest
-        limit:
-          type: integer
-          default: 10000
-        offset:
-          type: integer
         status:
           type: string
           enum:
             - active
+            - inactive
             - closed
             - all
-          description: 'Filter by event status (default: active)'
+          description: 'Filter by event status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
         searchIn:
           type: string
           enum:
@@ -1777,6 +1982,7 @@ components:
             - 1h
             - 6h
             - 1d
+          description: Optional for backward compatibility
         start:
           type: string
           format: date-time
@@ -1784,11 +1990,9 @@ components:
           type: string
           format: date-time
         limit:
-          type: integer
+          type: number
     OHLCVParams:
       type: object
-      required:
-        - resolution
       properties:
         resolution:
           type: string
@@ -1799,7 +2003,7 @@ components:
             - 1h
             - 6h
             - 1d
-          description: Candle interval for aggregation
+          description: Required for candle aggregation
         start:
           type: string
           format: date-time
@@ -1807,7 +2011,9 @@ components:
           type: string
           format: date-time
         limit:
-          type: integer
+          type: number
+      required:
+        - resolution
     TradesParams:
       type: object
       description: Parameters for fetching trade history. No resolution parameter - trades are discrete events.
@@ -1819,15 +2025,9 @@ components:
           type: string
           format: date-time
         limit:
-          type: integer
+          type: number
     CreateOrderParams:
       type: object
-      required:
-        - marketId
-        - outcomeId
-        - side
-        - type
-        - amount
       properties:
         marketId:
           type: string
@@ -1841,36 +2041,44 @@ components:
         type:
           type: string
           enum:
-            - limit
             - market
+            - limit
         amount:
           type: number
         price:
           type: number
+          description: Required for limit orders
         fee:
           type: number
+          description: 'Optional fee rate (e.g., 1000 for 0.1%)'
         tickSize:
           type: number
           description: Optional override for Limitless/Polymarket
         negRisk:
           type: boolean
           description: Optional override to skip neg-risk lookup (Polymarket)
+      required:
+        - marketId
+        - outcomeId
+        - side
+        - type
+        - amount
     BuiltOrder:
       type: object
-      description: 'An order built but not yet submitted, ready for inspection or middleware forwarding'
       properties:
         exchange:
           type: string
-          description: The exchange name this order was built for
+          description: The exchange name this order was built for.
         params:
-          $ref: '#/components/schemas/CreateOrderParams'
+          allOf:
+            - $ref: '#/components/schemas/CreateOrderParams'
+          description: The original params used to build this order.
         signedOrder:
           type: object
-          additionalProperties: true
-          description: 'For CLOB exchanges (Polymarket): the EIP-712 signed order ready to POST'
+          additionalProperties: {}
+          description: 'For CLOB exchanges (Polymarket): the EIP-712 signed order ready to POST to the exchange''s order endpoint.'
         tx:
           type: object
-          description: 'For on-chain AMM exchanges: the EVM transaction payload (reserved for future use)'
           properties:
             to:
               type: string
@@ -1879,18 +2087,30 @@ components:
             value:
               type: string
             chainId:
-              type: integer
+              type: number
+          required:
+            - to
+            - data
+            - value
+            - chainId
+          description: >-
+            For on-chain AMM exchanges: the EVM transaction payload. Reserved for future exchanges; no current exchange
+            populates this.
         raw:
           description: 'The raw, exchange-native payload. Always present.'
+      required:
+        - exchange
+        - params
+        - raw
     MyTradesParams:
       type: object
       properties:
         outcomeId:
           type: string
-          description: Filter to specific outcome/ticker
+          description: filter to specific outcome/ticker
         marketId:
           type: string
-          description: Filter to specific market
+          description: filter to specific market
         since:
           type: string
           format: date-time
@@ -1898,16 +2118,16 @@ components:
           type: string
           format: date-time
         limit:
-          type: integer
+          type: number
         cursor:
           type: string
-          description: For Kalshi cursor pagination
+          description: for Kalshi cursor pagination
     OrderHistoryParams:
       type: object
       properties:
         marketId:
           type: string
-          description: Required for Limitless (slug)
+          description: required for Limitless (slug)
         since:
           type: string
           format: date-time
@@ -1915,30 +2135,30 @@ components:
           type: string
           format: date-time
         limit:
-          type: integer
+          type: number
         cursor:
           type: string
     ExchangeCredentials:
       type: object
-      description: Optional authentication credentials for exchange operations
+      description: Optional authentication credentials for exchange operations.
       properties:
         apiKey:
           type: string
-          description: API key for the exchange
-        privateKey:
-          type: string
-          description: Private key for signing transactions
         apiSecret:
           type: string
-          description: API secret (if required by exchange)
         passphrase:
           type: string
-          description: Passphrase (if required by exchange)
-        funderAddress:
+        apiToken:
           type: string
-          description: The address funding the trades (Proxy address)
+          description: 'Metaculus: `Authorization: Token <apiToken>` for higher rate limits'
+        privateKey:
+          type: string
+          description: Required for Polymarket L1 auth
         signatureType:
           oneOf:
-            - type: integer
+            - type: number
             - type: string
-          description: 'Signature type (0=EOA, 1=Poly Proxy, 2=Gnosis Safe, or names like ''gnosis_safe'')'
+          description: '0 = EOA, 1 = Poly Proxy, 2 = Gnosis Safe (Can also use ''eoa'', ''polyproxy'', ''gnosis_safe'')'
+        funderAddress:
+          type: string
+          description: The address funding the trades (defaults to signer address)

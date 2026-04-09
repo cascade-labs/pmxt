@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.27.3] - 2026-04-09
+
+### Changed
+
+- **OpenAPI schemas are now AST-derived from `core/src/types.ts` and `core/src/BaseExchange.ts`**: Replaced the hand-maintained 350-line `SCHEMAS` literal in `scripts/generate-openapi.js` with a TypeScript compiler AST walker. Component schemas (`UnifiedMarket`, `UnifiedEvent`, `OHLCVParams`, etc.) now flow directly from the interface definitions, including JSDoc and trailing `//` comments as OpenAPI `description` fields. This removes a major source of documentation drift — adding a field to `types.ts` now lands in the generated spec without a parallel edit to the generator. Also adds `CandleInterval` type-alias resolution (so `resolution` renders as an enum, not `object`), `Date` → `format: date-time`, and `$ref` sibling-description wrapping via `allOf` for OpenAPI 3.0 compliance.
+
 ## [2.27.2] - 2026-04-09
 
 ### Fixed

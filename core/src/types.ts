@@ -10,9 +10,13 @@ export interface MarketOutcome {
     label: string;
     price: number;
     priceChange24h?: number;
+    /** Exchange-specific metadata (e.g., clobTokenId for Polymarket) */
     metadata?: Record<string, any>;
 }
 
+/**
+ * A grouped collection of related markets (e.g., "Who will be Fed Chair?" contains multiple candidate markets).
+ */
 export interface UnifiedEvent {
     id: string;
     title: string;
@@ -33,6 +37,7 @@ export interface UnifiedEvent {
 export interface UnifiedMarket {
     /** The unique identifier for this market */
     marketId: string;
+    /** Link to parent event */
     eventId?: string;
     title: string;
     description: string;
