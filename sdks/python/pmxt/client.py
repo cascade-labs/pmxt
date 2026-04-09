@@ -44,6 +44,7 @@ from .models import (
     EventFilterFunction,
     SubscribedAddressSnapshot,
 )
+from .constants import LOCAL_URL, resolve_pmxt_base_url
 from .errors import PmxtError, from_server_error
 from .server_manager import ServerManager
 
@@ -265,21 +266,34 @@ class Exchange(ABC):
         api_key: Optional[str] = None,
         private_key: Optional[str] = None,
         api_token: Optional[str] = None,
-        base_url: str = "http://localhost:3847",
-        auto_start_server: bool = True,
+        base_url: Optional[str] = None,
+        auto_start_server: Optional[bool] = None,
         proxy_address: Optional[str] = None,
         signature_type: Optional[Any] = None,
+        pmxt_api_key: Optional[str] = None,
     ):
         """
         Initialize an exchange client.
 
         Args:
             exchange_name: Name of the exchange ("polymarket" or "kalshi")
-            api_key: API key for authentication (optional)
+            api_key: API key for authentication on the venue itself (optional)
             private_key: Private key for authentication (optional)
             api_token: Metaculus-style bearer token (optional)
-            base_url: Base URL of the PMXT sidecar server
-            auto_start_server: Automatically start server if not running (default: True)
+            base_url: Explicit sidecar / hosted-pmxt base URL. When omitted,
+                the URL is resolved from ``PMXT_BASE_URL`` env, then from the
+                presence of ``pmxt_api_key`` (implying the hosted endpoint),
+                then falling back to the local sidecar default.
+            auto_start_server: When True, start the local sidecar on demand.
+                Defaults to True for local mode and False for hosted mode.
+                Pass an explicit bool to override.
+            proxy_address: Proxy/smart wallet address (optional).
+            signature_type: Signature type for venues that need it (optional).
+            pmxt_api_key: Hosted pmxt API key. Distinct from ``api_key``,
+                which targets the venue. If supplied (or via ``PMXT_API_KEY``
+                env) and no explicit ``base_url`` is set, the SDK auto-routes
+                to the hosted pmxt endpoint and injects ``Authorization:
+                Bearer`` on every request.
         """
         self.exchange_name = exchange_name.lower()
         self.api_key = api_key
@@ -290,11 +304,30 @@ class Exchange(ABC):
         self.markets: Dict[str, "UnifiedMarket"] = {}
         self.markets_by_slug: Dict[str, "UnifiedMarket"] = {}
         self._loaded_markets: bool = False
+        # Sticky flag: flipped to True the first time the sidecar rejects a
+        # GET read with 404/405 (i.e. an older pmxt-core that only supports
+        # POST). Once set, read methods skip the GET probe for the lifetime
+        # of this client and POST directly.
+        self._get_reads_unsupported: bool = False
 
-        # Initialize server manager
-        self._server_manager = ServerManager(base_url)
+        # Resolve base_url / hosted mode using the shared rules.
+        resolved = resolve_pmxt_base_url(
+            base_url=base_url,
+            pmxt_api_key=pmxt_api_key,
+        )
+        effective_base_url = resolved.base_url
+        self.pmxt_api_key = resolved.pmxt_api_key
+        self.is_hosted = resolved.is_hosted
 
-        # Ensure server is running (unless disabled)
+        # Default auto_start_server: true locally, false when hosted.
+        if auto_start_server is None:
+            auto_start_server = not self.is_hosted
+
+        # Initialize server manager against the resolved URL so lock-file
+        # lookups still work when pointing at the local sidecar.
+        self._server_manager = ServerManager(effective_base_url)
+
+        # Ensure server is running (unless disabled or running hosted).
         if auto_start_server:
             try:
                 self._server_manager.ensure_server_running()
@@ -302,7 +335,7 @@ class Exchange(ABC):
                 # Get the actual port the server is running on
                 # (may differ from default if default port was busy)
                 actual_port = self._server_manager.get_running_port()
-                base_url = f"http://localhost:{actual_port}"
+                effective_base_url = f"http://localhost:{actual_port}"
 
             except Exception as e:
                 raise Exception(
@@ -312,7 +345,7 @@ class Exchange(ABC):
                 )
 
         # Configure the API client with the actual base URL
-        config = Configuration(host=base_url)
+        config = Configuration(host=effective_base_url)
         self._api_client = ApiClient(configuration=config)
 
         self._api = DefaultApi(api_client=self._api_client)
@@ -339,16 +372,43 @@ class Exchange(ABC):
                 pass
         return str(e)
 
-    def _parse_api_exception(self, e: ApiException) -> PmxtError:
-        """Parse an ApiException into a typed PmxtError."""
+    def _parse_api_exception(self, e: Exception) -> PmxtError:
+        """Parse an ApiException (or pass through an existing PmxtError)
+        into a typed PmxtError.
+
+        The read path in ``_sidecar_read_request`` already raises typed
+        ``PmxtError`` subclasses (e.g. ``BadRequest``) for non-404/405
+        HTTP errors. Outer per-method ``except Exception`` wrappers call
+        this helper for uniform error handling, so returning those typed
+        errors unchanged prevents a second parse from collapsing them
+        back to a plain ``PmxtError``.
+        """
+        if isinstance(e, PmxtError):
+            return e
         try:
-            body = json.loads(e.body) if e.body else {}
+            body = json.loads(e.body) if getattr(e, "body", None) else {}
             error_data = body.get("error", {})
             if isinstance(error_data, dict):
                 return from_server_error(error_data)
             return PmxtError(str(error_data) if error_data else str(e))
         except (json.JSONDecodeError, AttributeError):
             return PmxtError(self._extract_api_error(e))
+
+    def _resolve_sidecar_host(self) -> str:
+        """Return the current sidecar host URL.
+
+        The local sidecar may pick a different port on restart (e.g. if
+        the previous port is still held by a zombie process), so we
+        re-read the lock file on every request instead of trusting the
+        ``configuration.host`` captured at SDK construction time. When
+        running hosted (``pmxt_api_key`` set) or against an explicit
+        remote URL, the server manager has no lock file and we fall
+        back to the configured host.
+        """
+        server_info = self._server_manager.get_server_info()
+        if server_info and 'port' in server_info:
+            return f"http://localhost:{server_info['port']}"
+        return self._api_client.configuration.host
 
     def _get_auth_headers(self) -> Dict[str, str]:
         """Build request headers with a fresh access token read from the lock file.
@@ -361,6 +421,8 @@ class Exchange(ABC):
         server_info = self._server_manager.get_server_info()
         if server_info and 'accessToken' in server_info:
             headers['x-pmxt-access-token'] = server_info['accessToken']
+        if self.pmxt_api_key:
+            headers['Authorization'] = f'Bearer {self.pmxt_api_key}'
         return headers
 
     def _get_credentials_dict(self) -> Optional[Dict[str, Any]]:
@@ -380,6 +442,117 @@ class Exchange(ABC):
         if self.signature_type is not None:
             creds["signatureType"] = self.signature_type
         return creds if creds else None
+
+    @staticmethod
+    def _build_sidecar_query_string(query: Dict[str, Any]) -> str:
+        """URL-encode a flat query dict for the sidecar GET path.
+
+        - ``None`` values are skipped entirely.
+        - Lists become repeated ``key=v1&key=v2`` pairs.
+        - Nested dicts are skipped (callers detect them via
+          ``_query_has_nested_object`` and fall back to POST).
+        """
+        from urllib.parse import quote
+        parts: List[str] = []
+        for key, value in query.items():
+            if value is None:
+                continue
+            if isinstance(value, (list, tuple)):
+                for v in value:
+                    if v is None:
+                        continue
+                    parts.append(f"{quote(str(key), safe='')}={quote(str(v), safe='')}")
+            elif isinstance(value, dict):
+                continue
+            elif isinstance(value, bool):
+                # Python's str(True) is "True" — the sidecar expects lowercase.
+                parts.append(f"{quote(str(key), safe='')}={'true' if value else 'false'}")
+            else:
+                parts.append(f"{quote(str(key), safe='')}={quote(str(value), safe='')}")
+        return "&".join(parts)
+
+    @staticmethod
+    def _query_has_nested_object(query: Dict[str, Any]) -> bool:
+        """True if any value is a nested dict (not a list/scalar).
+
+        Nested dicts can't be faithfully expressed in a query string, so we
+        fall back to POST to preserve the original shape.
+        """
+        for value in query.values():
+            if value is None:
+                continue
+            if isinstance(value, dict):
+                return True
+        return False
+
+    def _sidecar_read_request(
+        self,
+        method_name: str,
+        query: Dict[str, Any],
+        args: List[Any],
+    ) -> Dict[str, Any]:
+        """Dispatch a sidecar read, preferring GET with POST fallback.
+
+        GET is attempted when the client has no per-instance credentials
+        (the sidecar's GET handler drops credentials to avoid leaking them
+        through query strings), the server hasn't already told us it
+        doesn't understand GET, and the query is flat enough to serialise.
+
+        On 404/405 the client remembers the downgrade and transparently
+        POSTs, so users talking to an older pmxt-core build continue to
+        work unchanged. Every non-404/405 GET error is raised via the
+        same ``_parse_api_exception`` path as the POST fallback.
+        """
+        base_url = f"{self._resolve_sidecar_host()}/api/{self.exchange_name}/{method_name}"
+        creds = self._get_credentials_dict()
+        has_credentials = creds is not None
+
+        if (
+            not has_credentials
+            and not self._get_reads_unsupported
+            and not self._query_has_nested_object(query)
+        ):
+            qs = self._build_sidecar_query_string(query)
+            get_url = f"{base_url}?{qs}" if qs else base_url
+            headers = {"Accept": "application/json"}
+            headers.update(self._get_auth_headers())
+            try:
+                response = self._api_client.call_api(
+                    method="GET",
+                    url=get_url,
+                    header_params=headers,
+                )
+                response.read()
+                status = getattr(response, "status", 200)
+                if status in (404, 405):
+                    # Older sidecar without GET dispatch — remember and
+                    # fall through to POST below.
+                    self._get_reads_unsupported = True
+                else:
+                    return json.loads(response.data)
+            except ApiException as e:
+                if getattr(e, "status", None) in (404, 405):
+                    self._get_reads_unsupported = True
+                else:
+                    raise self._parse_api_exception(e) from None
+
+        # POST fallback — identical to the original per-method template.
+        body: Dict[str, Any] = {"args": args}
+        if creds:
+            body["credentials"] = creds
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        headers.update(self._get_auth_headers())
+        try:
+            response = self._api_client.call_api(
+                method="POST",
+                url=base_url,
+                body=body,
+                header_params=headers,
+            )
+            response.read()
+            return json.loads(response.data)
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     @property
     def has(self) -> Dict[str, Any]:
@@ -517,42 +690,30 @@ class Exchange(ABC):
 
     def fetch_markets(self, params: Optional[dict] = None, **kwargs) -> List[UnifiedMarket]:
         try:
-            args = []
+            args: List[Any] = []
             if kwargs:
                 params = {**(params or {}), **kwargs}
             if params is not None:
                 args.append(params)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchMarkets"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            query = dict(params or {})
+            data = self._handle_response(
+                self._sidecar_read_request("fetchMarkets", query, args)
+            )
             return [_convert_market(e) for e in data]
         except Exception as e:
             raise self._parse_api_exception(e) from None
 
     def fetch_markets_paginated(self, params: Optional[dict] = None, **kwargs) -> PaginatedMarketsResult:
         try:
-            args = []
+            args: List[Any] = []
             if kwargs:
                 params = {**(params or {}), **kwargs}
             if params is not None:
                 args.append(params)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchMarketsPaginated"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            query = dict(params or {})
+            data = self._handle_response(
+                self._sidecar_read_request("fetchMarketsPaginated", query, args)
+            )
             return PaginatedMarketsResult(
                 data=[_convert_market(m) for m in data.get("data", [])],
                 total=data.get("total", 0),
@@ -563,63 +724,45 @@ class Exchange(ABC):
 
     def fetch_events(self, params: Optional[dict] = None, **kwargs) -> List[UnifiedEvent]:
         try:
-            args = []
+            args: List[Any] = []
             if kwargs:
                 params = {**(params or {}), **kwargs}
             if params is not None:
                 args.append(params)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchEvents"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            query = dict(params or {})
+            data = self._handle_response(
+                self._sidecar_read_request("fetchEvents", query, args)
+            )
             return [_convert_event(e) for e in data]
         except Exception as e:
             raise self._parse_api_exception(e) from None
 
     def fetch_market(self, params: Optional[dict] = None, **kwargs) -> UnifiedMarket:
         try:
-            args = []
+            args: List[Any] = []
             if kwargs:
                 params = {**(params or {}), **kwargs}
             if params is not None:
                 args.append(params)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchMarket"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            query = dict(params or {})
+            data = self._handle_response(
+                self._sidecar_read_request("fetchMarket", query, args)
+            )
             return _convert_market(data)
         except Exception as e:
             raise self._parse_api_exception(e) from None
 
     def fetch_event(self, params: Optional[dict] = None, **kwargs) -> UnifiedEvent:
         try:
-            args = []
+            args: List[Any] = []
             if kwargs:
                 params = {**(params or {}), **kwargs}
             if params is not None:
                 args.append(params)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchEvent"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            query = dict(params or {})
+            data = self._handle_response(
+                self._sidecar_read_request("fetchEvent", query, args)
+            )
             return _convert_event(data)
         except Exception as e:
             raise self._parse_api_exception(e) from None
@@ -627,18 +770,11 @@ class Exchange(ABC):
     def fetch_order_book(self, id: Union[str, "MarketOutcome"]) -> OrderBook:
         try:
             id = _resolve_outcome_id(id)
-            args = []
-            args.append(id)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchOrderBook"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            args: List[Any] = [id]
+            query = {"id": id}
+            data = self._handle_response(
+                self._sidecar_read_request("fetchOrderBook", query, args)
+            )
             return _convert_order_book(data)
         except Exception as e:
             raise self._parse_api_exception(e) from None
@@ -663,134 +799,91 @@ class Exchange(ABC):
 
     def fetch_order(self, order_id: str) -> Order:
         try:
-            args = []
-            args.append(order_id)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchOrder"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            args: List[Any] = [order_id]
+            query = {"orderId": order_id}
+            data = self._handle_response(
+                self._sidecar_read_request("fetchOrder", query, args)
+            )
             return _convert_order(data)
         except Exception as e:
             raise self._parse_api_exception(e) from None
 
     def fetch_open_orders(self, market_id: Optional[str] = None) -> List[Order]:
         try:
-            args = []
+            args: List[Any] = []
             if market_id is not None:
                 args.append(market_id)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchOpenOrders"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            query = {"marketId": market_id}
+            data = self._handle_response(
+                self._sidecar_read_request("fetchOpenOrders", query, args)
+            )
             return [_convert_order(e) for e in data]
         except Exception as e:
             raise self._parse_api_exception(e) from None
 
     def fetch_my_trades(self, params: Optional[dict] = None, **kwargs) -> List[UserTrade]:
         try:
-            args = []
+            args: List[Any] = []
             if kwargs:
                 params = {**(params or {}), **kwargs}
             if params is not None:
                 args.append(params)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchMyTrades"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            query = dict(params or {})
+            data = self._handle_response(
+                self._sidecar_read_request("fetchMyTrades", query, args)
+            )
             return [_convert_user_trade(e) for e in data]
         except Exception as e:
             raise self._parse_api_exception(e) from None
 
     def fetch_closed_orders(self, params: Optional[dict] = None, **kwargs) -> List[Order]:
         try:
-            args = []
+            args: List[Any] = []
             if kwargs:
                 params = {**(params or {}), **kwargs}
             if params is not None:
                 args.append(params)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchClosedOrders"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            query = dict(params or {})
+            data = self._handle_response(
+                self._sidecar_read_request("fetchClosedOrders", query, args)
+            )
             return [_convert_order(e) for e in data]
         except Exception as e:
             raise self._parse_api_exception(e) from None
 
     def fetch_all_orders(self, params: Optional[dict] = None, **kwargs) -> List[Order]:
         try:
-            args = []
+            args: List[Any] = []
             if kwargs:
                 params = {**(params or {}), **kwargs}
             if params is not None:
                 args.append(params)
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchAllOrders"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            query = dict(params or {})
+            data = self._handle_response(
+                self._sidecar_read_request("fetchAllOrders", query, args)
+            )
             return [_convert_order(e) for e in data]
         except Exception as e:
             raise self._parse_api_exception(e) from None
 
     def fetch_positions(self) -> List[Position]:
         try:
-            args = []
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchPositions"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            args: List[Any] = []
+            query: Dict[str, Any] = {}
+            data = self._handle_response(
+                self._sidecar_read_request("fetchPositions", query, args)
+            )
             return [_convert_position(e) for e in data]
         except Exception as e:
             raise self._parse_api_exception(e) from None
 
     def fetch_balance(self) -> List[Balance]:
         try:
-            args = []
-            body: dict = {"args": args}
-            creds = self._get_credentials_dict()
-            if creds:
-                body["credentials"] = creds
-            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/fetchBalance"
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
-            headers.update(self._get_auth_headers())
-            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
-            response.read()
-            data = self._handle_response(json.loads(response.data))
+            args: List[Any] = []
+            query: Dict[str, Any] = {}
+            data = self._handle_response(
+                self._sidecar_read_request("fetchBalance", query, args)
+            )
             return [_convert_balance(e) for e in data]
         except Exception as e:
             raise self._parse_api_exception(e) from None
@@ -1082,17 +1175,13 @@ class Exchange(ABC):
                 if key not in params_dict:
                     params_dict[key] = value
 
-            request_body_dict = {"args": [outcome_id, params_dict]}
-            request_body = internal_models.FetchOHLCVRequest.from_dict(request_body_dict)
-
-            response = self._api.fetch_ohlcv(
-                exchange=self.exchange_name,
-                fetch_ohlcv_request=request_body,
+            args = [outcome_id, params_dict]
+            query = {"id": outcome_id, **params_dict}
+            data = self._handle_response(
+                self._sidecar_read_request("fetchOHLCV", query, args)
             )
-
-            data = self._handle_response(response.to_dict())
             return [_convert_candle(c) for c in data]
-        except ApiException as e:
+        except Exception as e:
             raise self._parse_api_exception(e) from None
 
     def fetch_trades(
@@ -1132,17 +1221,13 @@ class Exchange(ABC):
                 if key not in params_dict:
                     params_dict[key] = value
 
-            request_body_dict = {"args": [outcome_id, params_dict]}
-            request_body = internal_models.FetchTradesRequest.from_dict(request_body_dict)
-
-            response = self._api.fetch_trades(
-                exchange=self.exchange_name,
-                fetch_trades_request=request_body,
+            args = [outcome_id, params_dict]
+            query = {"id": outcome_id, **params_dict}
+            data = self._handle_response(
+                self._sidecar_read_request("fetchTrades", query, args)
             )
-
-            data = self._handle_response(response.to_dict())
             return [_convert_trade(t) for t in data]
-        except ApiException as e:
+        except Exception as e:
             raise self._parse_api_exception(e) from None
 
     # WebSocket Streaming Methods

@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.27.0] - 2026-04-09
+
+### Added
+
+- **`GET /api/:exchange/:method` for read endpoints**: Every `fetch*` method is now exposed as an idempotent, cacheable HTTP GET in addition to the existing POST. All 15 fetches flip to GET — `fetchMarkets`, `fetchMarketsPaginated`, `fetchEvents`, `fetchMarket`, `fetchEvent`, `fetchOrderBook`, `fetchOHLCV`, `fetchTrades`, `fetchOrder`, `fetchOpenOrders`, `fetchMyTrades`, `fetchClosedOrders`, `fetchAllOrders`, `fetchPositions`, `fetchBalance`. Writes (`createOrder`/`cancelOrder`/`buildOrder`/`submitOrder`), lifecycle (`loadMarkets`/`close`), realtime (`watch*`/`unwatch*`), and in-memory helpers with non-serialisable args (`filterMarkets`/`filterEvents`/`getExecutionPrice*`) remain POST. Lets HTTP caches, CDNs, and browsers treat reads as the reads they actually are — `GET /api/polymarket/fetchMarkets?query=election&limit=3` Just Works.
+
+  Mechanically: `scripts/generate-openapi.js` walks each method's AST parameters, classifies the verb, and emits the right OpenAPI shape (query parameters for GETs, request body for POSTs). The classifier accepts any `fetch*` signature shaped as `[primitive..., object?]`, so multi-arg reads like `fetchOHLCV(id, params)` and `fetchTrades(id, params)` are GET-eligible too — primitive args travel by name and the trailing object is spread into the remaining query slots. Alongside `openapi.yaml` the generator writes a small `method-verbs.json` sidecar; the runtime server loads it at startup to drive its GET dispatcher, translating `req.query` into the positional `args` array. `method-verbs.json` ships in the published tarball at `dist/server/method-verbs.json`.
+
+- **Kind-aware query-string coercion**: Query values are coerced using the declared arg kind from `method-verbs.json`, not a lossy autodetect heuristic. `string` args are left alone (critical for Polymarket's all-numeric CLOB token IDs like `"559652..."`, which must stay strings so `.trim()` and downstream venue code keep working), `number` and `boolean` args parse strictly, and object-arg spreads fall back to the permissive heuristic for unknown fields. Before this fix, `GET /api/polymarket/fetchOrderBook?id=559652...` silently failed with `id.trim is not a function` because the ID was parsed as a JS number.
+
+- **POST continues to work for every method**, including the ones now exposed as GET, so existing SDK clients that unconditionally POST keep running unchanged. The GET surface is purely additive — the server negotiates verbs per method, and clients can probe-then-fall-back.
+
+- **TypeScript and Python SDKs transparently prefer GET for reads**: All 15 `fetch*` methods now route through a shared `sidecarReadRequest` / `_sidecar_read_request` helper that issues GET against the sidecar by default, with automatic POST fallback for (a) instances that carry per-client credentials (so API keys don't leak into query strings or access logs), (b) calls with nested-object params that can't round-trip through a query string, and (c) older sidecars that return 404/405. On a 404/405 the client flips a sticky `_getReadsUnsupported` / `_get_reads_unsupported` flag and every subsequent read on that instance goes straight to POST — one round-trip penalty on the first call, zero overhead after. Fully backward compatible in both directions: new SDKs talking to old sidecars keep working, old SDKs talking to new sidecars keep working.
+
+### Fixed
+
+- **Python SDK: sidecar host re-resolved on every request**: `self._api_client.configuration.host` used to be frozen at SDK construction time, but the local sidecar can pick a new port on restart (e.g. if the previous port is held by a zombie). Combined with the fresh-every-call access token read from the lock file, this produced `Unauthorized: Invalid or missing access token` errors when the sidecar cycled — the new token went to the old port, where a different sidecar was still running with a different token. The new `_resolve_sidecar_host()` helper reads the lock file on every request so host and token always move together. Pre-existing latent bug on the POST path too; now fixed for both.
+
 ## [2.26.2] - 2026-04-08
 
 ### Added
