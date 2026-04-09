@@ -63,4 +63,58 @@ describe('KalshiNormalizer event description', () => {
         );
         expect(unifiedEvent.description).not.toContain('{x}0, 2026');
     });
+
+    test('never leaks a candidate name when every market has a distinct template', () => {
+        const event: KalshiRawEvent = {
+            event_ticker: 'KXDISTINCT',
+            title: 'Distinct dates per market',
+            markets: [
+                makeMarket({
+                    ticker: 'KXDISTINCT-A',
+                    yes_sub_title: 'Alice',
+                    rules_primary: 'If Alice wins by Jan 1, 2026, then the market resolves to Yes.',
+                }),
+                makeMarket({
+                    ticker: 'KXDISTINCT-B',
+                    yes_sub_title: 'Bob',
+                    rules_primary: 'If Bob wins by Feb 1, 2026, then the market resolves to Yes.',
+                }),
+                makeMarket({
+                    ticker: 'KXDISTINCT-C',
+                    yes_sub_title: 'Carol',
+                    rules_primary: 'If Carol wins by Mar 1, 2026, then the market resolves to Yes.',
+                }),
+            ],
+        };
+
+        const unifiedEvent = normalizer.normalizeEvent(event)!;
+        expect(unifiedEvent.description).toContain('{x}');
+        expect(unifiedEvent.description).not.toContain('Alice');
+        expect(unifiedEvent.description).not.toContain('Bob');
+        expect(unifiedEvent.description).not.toContain('Carol');
+    });
+
+    test('templates non-ASCII candidate names', () => {
+        const event: KalshiRawEvent = {
+            event_ticker: 'KXUNICODE',
+            title: 'Unicode candidate names',
+            markets: [
+                makeMarket({
+                    ticker: 'KXUNICODE-J',
+                    yes_sub_title: 'Jose Munoz',
+                    rules_primary: 'If Jose Munoz is elected, then the market resolves to Yes.',
+                }),
+                makeMarket({
+                    ticker: 'KXUNICODE-M',
+                    yes_sub_title: 'Muller',
+                    rules_primary: 'If Muller is elected, then the market resolves to Yes.',
+                }),
+            ],
+        };
+
+        const unifiedEvent = normalizer.normalizeEvent(event)!;
+        expect(unifiedEvent.description).toContain('{x}');
+        expect(unifiedEvent.description).not.toContain('Jose');
+        expect(unifiedEvent.description).not.toContain('Muller');
+    });
 });
