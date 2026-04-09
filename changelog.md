@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.27.4] - 2026-04-09
+
+### Fixed
+
+- **`pmxtjs` build broken by nested `oneOf` in `filterMarkets`/`filterEvents` request schemas**: After 2.27.3 began AST-resolving `EventFilterCriteria`/`MarketFilterCriteria` type aliases, the generated `items.oneOf` wrapped a second anonymous `oneOf` (for `string | Criteria | FilterFunction`). `openapi-generator-cli` emits broken TypeScript for this nested-anonymous-oneOf shape — it generates a `FilterEventsRequestArgsInnerOneOf` class but no matching `instanceOfFilterEventsRequestArgsInnerOneOf` type guard, which breaks `tsc`. Python published fine because its codegen handles nested `oneOf` differently. The generator now flattens nested anonymous `oneOf` schemas into a single flat union inside `items`, which is semantically equivalent (`items` applies to every tuple position) and round-trips cleanly through openapi-generator-cli.
+
 ## [2.27.3] - 2026-04-09
 
 ### Changed

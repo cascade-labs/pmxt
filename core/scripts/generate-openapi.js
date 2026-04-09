@@ -526,11 +526,23 @@ function buildPathSpec(method, sourceFile) {
     if (requiredCount === 1) argsSchema.minItems = 1;
   } else {
     const itemSchemas = params.map(p => typeNodeToSchema(p.type, sourceFile) || {});
+    // Flatten nested oneOfs — openapi-generator-cli produces broken TS
+    // output for anonymous nested oneOf schemas (missing `instanceOf*`
+    // type guards for the inner variants). A flat union is semantically
+    // equivalent here since `items` applies to every tuple position.
+    const flattened = [];
+    for (const s of itemSchemas) {
+      if (s && Array.isArray(s.oneOf) && Object.keys(s).length === 1) {
+        flattened.push(...s.oneOf);
+      } else {
+        flattened.push(s);
+      }
+    }
     argsSchema = {
       type: 'array',
       minItems: requiredCount,
       maxItems: totalCount,
-      items: { oneOf: itemSchemas },
+      items: { oneOf: flattened },
     };
   }
 

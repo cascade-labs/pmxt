@@ -1099,98 +1099,97 @@ paths:
                       - type: array
                         items:
                           $ref: '#/components/schemas/UnifiedMarket'
-                      - oneOf:
-                          - type: string
-                          - type: object
+                      - type: string
+                      - type: object
+                        properties:
+                          text:
+                            type: string
+                          searchIn:
+                            type: array
+                            items:
+                              type: string
+                              enum:
+                                - title
+                                - description
+                                - category
+                                - tags
+                                - outcomes
+                          volume24h:
+                            type: object
                             properties:
-                              text:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                          volume:
+                            type: object
+                            properties:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                          liquidity:
+                            type: object
+                            properties:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                          openInterest:
+                            type: object
+                            properties:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                          resolutionDate:
+                            type: object
+                            properties:
+                              before:
                                 type: string
-                              searchIn:
-                                type: array
-                                items:
-                                  type: string
-                                  enum:
-                                    - title
-                                    - description
-                                    - category
-                                    - tags
-                                    - outcomes
-                              volume24h:
-                                type: object
-                                properties:
-                                  min:
-                                    type: number
-                                  max:
-                                    type: number
-                              volume:
-                                type: object
-                                properties:
-                                  min:
-                                    type: number
-                                  max:
-                                    type: number
-                              liquidity:
-                                type: object
-                                properties:
-                                  min:
-                                    type: number
-                                  max:
-                                    type: number
-                              openInterest:
-                                type: object
-                                properties:
-                                  min:
-                                    type: number
-                                  max:
-                                    type: number
-                              resolutionDate:
-                                type: object
-                                properties:
-                                  before:
-                                    type: string
-                                    format: date-time
-                                  after:
-                                    type: string
-                                    format: date-time
-                              category:
+                                format: date-time
+                              after:
                                 type: string
-                              tags:
-                                type: array
-                                items:
-                                  type: string
-                              price:
-                                type: object
-                                properties:
-                                  outcome:
-                                    type: string
-                                    enum:
-                                      - 'yes'
-                                      - 'no'
-                                      - up
-                                      - down
-                                  min:
-                                    type: number
-                                  max:
-                                    type: number
-                                required:
-                                  - outcome
-                              priceChange24h:
-                                type: object
-                                properties:
-                                  outcome:
-                                    type: string
-                                    enum:
-                                      - 'yes'
-                                      - 'no'
-                                      - up
-                                      - down
-                                  min:
-                                    type: number
-                                  max:
-                                    type: number
-                                required:
-                                  - outcome
-                          - type: object
+                                format: date-time
+                          category:
+                            type: string
+                          tags:
+                            type: array
+                            items:
+                              type: string
+                          price:
+                            type: object
+                            properties:
+                              outcome:
+                                type: string
+                                enum:
+                                  - 'yes'
+                                  - 'no'
+                                  - up
+                                  - down
+                              min:
+                                type: number
+                              max:
+                                type: number
+                            required:
+                              - outcome
+                          priceChange24h:
+                            type: object
+                            properties:
+                              outcome:
+                                type: string
+                                enum:
+                                  - 'yes'
+                                  - 'no'
+                                  - up
+                                  - down
+                              min:
+                                type: number
+                              max:
+                                type: number
+                            required:
+                              - outcome
+                      - type: object
                 credentials:
                   $ref: '#/components/schemas/ExchangeCredentials'
               required:
@@ -1234,42 +1233,41 @@ paths:
                       - type: array
                         items:
                           $ref: '#/components/schemas/UnifiedEvent'
-                      - oneOf:
-                          - type: string
-                          - type: object
+                      - type: string
+                      - type: object
+                        properties:
+                          text:
+                            type: string
+                          searchIn:
+                            type: array
+                            items:
+                              type: string
+                              enum:
+                                - title
+                                - description
+                                - category
+                                - tags
+                          category:
+                            type: string
+                          tags:
+                            type: array
+                            items:
+                              type: string
+                          marketCount:
+                            type: object
                             properties:
-                              text:
-                                type: string
-                              searchIn:
-                                type: array
-                                items:
-                                  type: string
-                                  enum:
-                                    - title
-                                    - description
-                                    - category
-                                    - tags
-                              category:
-                                type: string
-                              tags:
-                                type: array
-                                items:
-                                  type: string
-                              marketCount:
-                                type: object
-                                properties:
-                                  min:
-                                    type: number
-                                  max:
-                                    type: number
-                              totalVolume:
-                                type: object
-                                properties:
-                                  min:
-                                    type: number
-                                  max:
-                                    type: number
-                          - type: object
+                              min:
+                                type: number
+                              max:
+                                type: number
+                          totalVolume:
+                            type: object
+                            properties:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                      - type: object
                 credentials:
                   $ref: '#/components/schemas/ExchangeCredentials'
               required:
