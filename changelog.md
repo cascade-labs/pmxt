@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.27.6] - 2026-04-09
+
+### Fixed
+
+- **Kalshi `UnifiedEvent.description` malformed and `MarketOutcome.label` showed `:: Democratic`** (issue #69): Two bugs in `core/src/exchanges/kalshi/normalizer.ts`. (1) `deriveEventDescription` used raw longest-common-prefix/suffix slicing, so if one market in an event had a slightly different trailing date (e.g. `KXCABOUT-26MAR` had markets ending in `Mar 10, 2026` and `Mar 30, 2026`), the suffix loop character-stripped until a match landed mid-token and produced `"If {x}0, 2026, then the market resolves to Yes."`. Replaced with a template-voting algorithm: substitute each market's candidate name with `{x}` in its `rules_primary`, then pick the most frequent template. (2) Outcome labels preferred `market.subtitle` over `yes_sub_title`, but Kalshi sometimes stores structural metadata like `":: Democratic"` in `subtitle` (observed on `KXGOVCA-26`), producing labels like `":: Democratic"` / `"Not :: Democratic"`. Label derivation now prefers `yes_sub_title` and ignores any value starting with `::`. Additional hardening: only templates containing `{x}` are eligible to win the vote (so a rule we failed to template can never leak a specific candidate name into the event description), and templating uses Unicode-aware word boundaries (`(?<![\p{L}\p{N}])…(?![\p{L}\p{N}])`) so non-ASCII candidate names still match. Covered by four regression tests in `core/test/unit/normalizers/kalshi.test.ts`: KXCABOUT suffix-drift case, KXGOVCA structural-subtitle case, no-majority distinct-dates case, and non-ASCII candidate names case.
+
 ## [2.27.5] - 2026-04-09
 
 ### Changed
