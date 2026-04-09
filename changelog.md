@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.27.6] - 2026-04-09
+
+### Fixed
+
+- **Kalshi `UnifiedEvent.description` malformed and `MarketOutcome.label` showed `:: Democratic`** (issue #69): Two bugs in `core/src/exchanges/kalshi/normalizer.ts`. (1) `deriveEventDescription` used raw longest-common-prefix/suffix slicing, so if one market in an event had a slightly different trailing date (e.g. `KXCABOUT-26MAR` had markets ending in `Mar 10, 2026` and `Mar 30, 2026`), the suffix loop character-stripped until a match landed mid-token and produced `"If {x}0, 2026, then the market resolves to Yes."`. Replaced with a template-voting algorithm: substitute each market's candidate name with `{x}` in its `rules_primary`, then pick the most frequent template. (2) Outcome labels preferred `market.subtitle` over `yes_sub_title`, but Kalshi sometimes stores structural metadata like `":: Democratic"` in `subtitle` (observed on `KXGOVCA-26`), producing labels like `":: Democratic"` / `"Not :: Democratic"`. Label derivation now prefers `yes_sub_title` and ignores any value starting with `::`. Additional hardening: only templates containing `{x}` are eligible to win the vote (so a rule we failed to template can never leak a specific candidate name into the event description), and templating uses Unicode-aware word boundaries (`(?<![\p{L}\p{N}])…(?![\p{L}\p{N}])`) so non-ASCII candidate names still match. Covered by four regression tests in `core/test/unit/normalizers/kalshi.test.ts`: KXCABOUT suffix-drift case, KXGOVCA structural-subtitle case, no-majority distinct-dates case, and non-ASCII candidate names case.
+
+## [2.27.5] - 2026-04-09
+
+### Changed
+
+- **Documented all 129 previously undocumented interface fields in `core/src/types.ts` and `core/src/BaseExchange.ts`**: After 2.27.3 made the OpenAPI generator AST-derived, fields without JSDoc or trailing `//` comments rendered in the spec (and downstream Mintlify docs) with no description — `offset`, `limit`, every `ExchangeHas` capability flag, all `UnifiedMarket` / `UnifiedEvent` / `Order` / `Position` / `Trade` fields, etc. This release adds concise JSDoc to every undocumented property signature in the two source files, bringing coverage from 68/197 (34.5%) to 197/197 (100%). Regenerated `openapi.yaml` now carries 282 `description:` fields (up from ~155). Pure documentation change — no type signatures, runtime behaviour, or SDK surface modified. The AST walker picks these up automatically, so Mintlify's API playground will now surface field descriptions for every parameter and response model.
+
+## [2.27.4] - 2026-04-09
+
+### Fixed
+
+- **`pmxtjs` build broken by nested `oneOf` in `filterMarkets`/`filterEvents` request schemas**: After 2.27.3 began AST-resolving `EventFilterCriteria`/`MarketFilterCriteria` type aliases, the generated `items.oneOf` wrapped a second anonymous `oneOf` (for `string | Criteria | FilterFunction`). `openapi-generator-cli` emits broken TypeScript for this nested-anonymous-oneOf shape — it generates a `FilterEventsRequestArgsInnerOneOf` class but no matching `instanceOfFilterEventsRequestArgsInnerOneOf` type guard, which breaks `tsc`. Python published fine because its codegen handles nested `oneOf` differently. The generator now flattens nested anonymous `oneOf` schemas into a single flat union inside `items`, which is semantically equivalent (`items` applies to every tuple position) and round-trips cleanly through openapi-generator-cli.
+
+## [2.27.3] - 2026-04-09
+
+### Changed
+
+- **OpenAPI schemas are now AST-derived from `core/src/types.ts` and `core/src/BaseExchange.ts`**: Replaced the hand-maintained 350-line `SCHEMAS` literal in `scripts/generate-openapi.js` with a TypeScript compiler AST walker. Component schemas (`UnifiedMarket`, `UnifiedEvent`, `OHLCVParams`, etc.) now flow directly from the interface definitions, including JSDoc and trailing `//` comments as OpenAPI `description` fields. This removes a major source of documentation drift — adding a field to `types.ts` now lands in the generated spec without a parallel edit to the generator. Also adds `CandleInterval` type-alias resolution (so `resolution` renders as an enum, not `object`), `Date` → `format: date-time`, and `$ref` sibling-description wrapping via `allOf` for OpenAPI 3.0 compliance.
+
+## [2.27.2] - 2026-04-09
+
+### Fixed
+
+- **Object params rendered as `params: string` in the generated OpenAPI spec**: `fetchOHLCV(id, params)` and `fetchTrades(id, params)` have a `[primitive, object]` signature. The GET branch of `scripts/generate-openapi.js` only expanded object props when there was a *single* object arg, so for these mixed signatures the trailing object was emitted as a bare `params` query string — which surfaced in Mintlify's API playground as two required fields (`id` and `params`) with no way to discover `resolution`, `start`, `end`, `limit`. The generator now expands any object-kind param regardless of arity, so the spec and the docs show the real field list.
+
+## [2.27.1] - 2026-04-09
+
+### Fixed
+
+- **Broken 2.27.0 npm build**: `sdks/typescript/pmxt/client.ts` and `sdks/python/pmxt/client.py` imported from a `constants` module that was not committed in 2.27.0, causing `pmxtjs@2.27.0` to fail `tsc` with `TS2307: Cannot find module './constants.js'`. Python published cleanly only because CPython resolves imports at runtime, not at build time. This release commits the missing `sdks/typescript/pmxt/constants.ts` and `sdks/python/pmxt/constants.py` — self-contained modules exporting `HOSTED_URL`, `LOCAL_URL`, `ENV` names, and the `resolvePmxtBaseUrl` / `resolve_pmxt_base_url` helper that `client.ts` / `client.py` already referenced. No behaviour change beyond unbreaking the build.
+
+## [2.27.0] - 2026-04-09
+
+### Added
+
+- **`GET /api/:exchange/:method` for read endpoints**: Every `fetch*` method is now exposed as an idempotent, cacheable HTTP GET in addition to the existing POST. All 15 fetches flip to GET — `fetchMarkets`, `fetchMarketsPaginated`, `fetchEvents`, `fetchMarket`, `fetchEvent`, `fetchOrderBook`, `fetchOHLCV`, `fetchTrades`, `fetchOrder`, `fetchOpenOrders`, `fetchMyTrades`, `fetchClosedOrders`, `fetchAllOrders`, `fetchPositions`, `fetchBalance`. Writes (`createOrder`/`cancelOrder`/`buildOrder`/`submitOrder`), lifecycle (`loadMarkets`/`close`), realtime (`watch*`/`unwatch*`), and in-memory helpers with non-serialisable args (`filterMarkets`/`filterEvents`/`getExecutionPrice*`) remain POST. Lets HTTP caches, CDNs, and browsers treat reads as the reads they actually are — `GET /api/polymarket/fetchMarkets?query=election&limit=3` Just Works.
+
+  Mechanically: `scripts/generate-openapi.js` walks each method's AST parameters, classifies the verb, and emits the right OpenAPI shape (query parameters for GETs, request body for POSTs). The classifier accepts any `fetch*` signature shaped as `[primitive..., object?]`, so multi-arg reads like `fetchOHLCV(id, params)` and `fetchTrades(id, params)` are GET-eligible too — primitive args travel by name and the trailing object is spread into the remaining query slots. Alongside `openapi.yaml` the generator writes a small `method-verbs.json` sidecar; the runtime server loads it at startup to drive its GET dispatcher, translating `req.query` into the positional `args` array. `method-verbs.json` ships in the published tarball at `dist/server/method-verbs.json`.
+
+- **Kind-aware query-string coercion**: Query values are coerced using the declared arg kind from `method-verbs.json`, not a lossy autodetect heuristic. `string` args are left alone (critical for Polymarket's all-numeric CLOB token IDs like `"559652..."`, which must stay strings so `.trim()` and downstream venue code keep working), `number` and `boolean` args parse strictly, and object-arg spreads fall back to the permissive heuristic for unknown fields. Before this fix, `GET /api/polymarket/fetchOrderBook?id=559652...` silently failed with `id.trim is not a function` because the ID was parsed as a JS number.
+
+- **POST continues to work for every method**, including the ones now exposed as GET, so existing SDK clients that unconditionally POST keep running unchanged. The GET surface is purely additive — the server negotiates verbs per method, and clients can probe-then-fall-back.
+
+- **TypeScript and Python SDKs transparently prefer GET for reads**: All 15 `fetch*` methods now route through a shared `sidecarReadRequest` / `_sidecar_read_request` helper that issues GET against the sidecar by default, with automatic POST fallback for (a) instances that carry per-client credentials (so API keys don't leak into query strings or access logs), (b) calls with nested-object params that can't round-trip through a query string, and (c) older sidecars that return 404/405. On a 404/405 the client flips a sticky `_getReadsUnsupported` / `_get_reads_unsupported` flag and every subsequent read on that instance goes straight to POST — one round-trip penalty on the first call, zero overhead after. Fully backward compatible in both directions: new SDKs talking to old sidecars keep working, old SDKs talking to new sidecars keep working.
+
+### Fixed
+
+- **Python SDK: sidecar host re-resolved on every request**: `self._api_client.configuration.host` used to be frozen at SDK construction time, but the local sidecar can pick a new port on restart (e.g. if the previous port is held by a zombie). Combined with the fresh-every-call access token read from the lock file, this produced `Unauthorized: Invalid or missing access token` errors when the sidecar cycled — the new token went to the old port, where a different sidecar was still running with a different token. The new `_resolve_sidecar_host()` helper reads the lock file on every request so host and token always move together. Pre-existing latent bug on the POST path too; now fixed for both.
+
 ## [2.26.2] - 2026-04-08
 
 ### Added

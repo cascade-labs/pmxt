@@ -68,25 +68,96 @@ paths:
         values may return inconsistent results if the exchange reorders or adds markets between requests. Use
         `loadMarkets()` once to get a stable snapshot, then paginate over `Object.values(exchange.markets)` locally.
   '/api/{exchange}/fetchMarkets':
-    post:
+    get:
       summary: Fetch Markets
       operationId: fetchMarkets
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchMarketsRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    $ref: '#/components/schemas/MarketFilterParams'
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+          description: Maximum number of results to return
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: number
+          description: Pagination offset — number of results to skip
+        - in: query
+          name: sort
+          required: false
+          schema:
+            type: string
+            enum:
+              - volume
+              - liquidity
+              - newest
+          description: Sort order for results
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum:
+              - active
+              - inactive
+              - closed
+              - all
+          description: 'Filter by market status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
+        - in: query
+          name: searchIn
+          required: false
+          schema:
+            type: string
+            enum:
+              - title
+              - description
+              - both
+          description: 'Where to search (default: ''title'')'
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+          description: For keyword search
+        - in: query
+          name: slug
+          required: false
+          schema:
+            type: string
+          description: For slug/ticker lookup
+        - in: query
+          name: marketId
+          required: false
+          schema:
+            type: string
+          description: Direct lookup by market ID
+        - in: query
+          name: outcomeId
+          required: false
+          schema:
+            type: string
+          description: Reverse lookup -- find market containing this outcome
+        - in: query
+          name: eventId
+          required: false
+          schema:
+            type: string
+          description: Find markets belonging to an event
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: number
+          description: For pagination (used by Limitless)
+        - in: query
+          name: similarityThreshold
+          required: false
+          schema:
+            type: number
+          description: For semantic search (used by Limitless)
       responses:
         '200':
           description: Fetch Markets response
@@ -105,30 +176,21 @@ paths:
         Fetch markets with optional filtering, search, or slug lookup. Always hits the exchange API — results reflect
         the live state at the time of the call.
   '/api/{exchange}/fetchMarketsPaginated':
-    post:
+    get:
       summary: Fetch Markets Paginated
       operationId: fetchMarketsPaginated
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchMarketsPaginatedRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    type: object
-                    properties:
-                      limit:
-                        type: number
-                      cursor:
-                        type: string
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Fetch Markets Paginated response
@@ -148,25 +210,72 @@ paths:
         invalidated after `snapshotTTL` ms (configured via `ExchangeOptions` in the constructor). A request using a
         cursor from an expired snapshot throws `'Cursor has expired'`.
   '/api/{exchange}/fetchEvents':
-    post:
+    get:
       summary: Fetch Events
       operationId: fetchEvents
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchEventsRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    $ref: '#/components/schemas/EventFetchParams'
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+          description: For keyword search
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+          description: Maximum number of results to return
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: number
+          description: Pagination offset — number of results to skip
+        - in: query
+          name: sort
+          required: false
+          schema:
+            type: string
+            enum:
+              - volume
+              - liquidity
+              - newest
+          description: Sort order for results
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum:
+              - active
+              - inactive
+              - closed
+              - all
+          description: 'Filter by event status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
+        - in: query
+          name: searchIn
+          required: false
+          schema:
+            type: string
+            enum:
+              - title
+              - description
+              - both
+          description: 'Where to search (default: ''title'')'
+        - in: query
+          name: eventId
+          required: false
+          schema:
+            type: string
+          description: Direct lookup by event ID
+        - in: query
+          name: slug
+          required: false
+          schema:
+            type: string
+          description: Lookup by event slug
       responses:
         '200':
           description: Fetch Events response
@@ -185,25 +294,96 @@ paths:
         Fetch events with optional keyword search. Events group related markets together (e.g., "Who will be Fed Chair?"
         contains multiple candidate markets).
   '/api/{exchange}/fetchMarket':
-    post:
+    get:
       summary: Fetch Market
       operationId: fetchMarket
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchMarketRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    $ref: '#/components/schemas/MarketFilterParams'
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+          description: Maximum number of results to return
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: number
+          description: Pagination offset — number of results to skip
+        - in: query
+          name: sort
+          required: false
+          schema:
+            type: string
+            enum:
+              - volume
+              - liquidity
+              - newest
+          description: Sort order for results
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum:
+              - active
+              - inactive
+              - closed
+              - all
+          description: 'Filter by market status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
+        - in: query
+          name: searchIn
+          required: false
+          schema:
+            type: string
+            enum:
+              - title
+              - description
+              - both
+          description: 'Where to search (default: ''title'')'
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+          description: For keyword search
+        - in: query
+          name: slug
+          required: false
+          schema:
+            type: string
+          description: For slug/ticker lookup
+        - in: query
+          name: marketId
+          required: false
+          schema:
+            type: string
+          description: Direct lookup by market ID
+        - in: query
+          name: outcomeId
+          required: false
+          schema:
+            type: string
+          description: Reverse lookup -- find market containing this outcome
+        - in: query
+          name: eventId
+          required: false
+          schema:
+            type: string
+          description: Find markets belonging to an event
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: number
+          description: For pagination (used by Limitless)
+        - in: query
+          name: similarityThreshold
+          required: false
+          schema:
+            type: number
+          description: For semantic search (used by Limitless)
       responses:
         '200':
           description: Fetch Market response
@@ -220,25 +400,72 @@ paths:
         Fetch a single market by lookup parameters. Convenience wrapper around fetchMarkets() that returns a single
         result or throws MarketNotFound.
   '/api/{exchange}/fetchEvent':
-    post:
+    get:
       summary: Fetch Event
       operationId: fetchEvent
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchEventRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    $ref: '#/components/schemas/EventFetchParams'
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+          description: For keyword search
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+          description: Maximum number of results to return
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: number
+          description: Pagination offset — number of results to skip
+        - in: query
+          name: sort
+          required: false
+          schema:
+            type: string
+            enum:
+              - volume
+              - liquidity
+              - newest
+          description: Sort order for results
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum:
+              - active
+              - inactive
+              - closed
+              - all
+          description: 'Filter by event status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
+        - in: query
+          name: searchIn
+          required: false
+          schema:
+            type: string
+            enum:
+              - title
+              - description
+              - both
+          description: 'Where to search (default: ''title'')'
+        - in: query
+          name: eventId
+          required: false
+          schema:
+            type: string
+          description: Direct lookup by event ID
+        - in: query
+          name: slug
+          required: false
+          schema:
+            type: string
+          description: Lookup by event slug
       responses:
         '200':
           description: Fetch Event response
@@ -255,30 +482,49 @@ paths:
         Fetch a single event by lookup parameters. Convenience wrapper around fetchEvents() that returns a single result
         or throws EventNotFound.
   '/api/{exchange}/fetchOHLCV':
-    post:
+    get:
       summary: Fetch O H L C V
       operationId: fetchOHLCV
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchOHLCVRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  minItems: 2
-                  maxItems: 2
-                  items:
-                    oneOf:
-                      - type: string
-                      - $ref: '#/components/schemas/OHLCVParams'
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
-              required:
-                - args
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: resolution
+          required: false
+          schema:
+            type: string
+            enum:
+              - 1m
+              - 5m
+              - 15m
+              - 1h
+              - 6h
+              - 1d
+          description: Required for candle aggregation
+        - in: query
+          name: start
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Start of the time range
+        - in: query
+          name: end
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: End of the time range
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+          description: Maximum number of results to return
       responses:
         '200':
           description: Fetch O H L C V response
@@ -295,28 +541,16 @@ paths:
                           $ref: '#/components/schemas/PriceCandle'
       description: Fetch historical OHLCV (candlestick) price data for a specific market outcome.
   '/api/{exchange}/fetchOrderBook':
-    post:
+    get:
       summary: Fetch Order Book
       operationId: fetchOrderBook
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchOrderBookRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    type: string
-                  minItems: 1
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
-              required:
-                - args
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Fetch Order Book response
@@ -333,32 +567,36 @@ paths:
         Fetch the current order book (bids/asks) for a specific outcome. Essential for calculating spread, depth, and
         execution prices.
   '/api/{exchange}/fetchTrades':
-    post:
+    get:
       summary: Fetch Trades
       operationId: fetchTrades
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchTradesRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  minItems: 2
-                  maxItems: 2
-                  items:
-                    oneOf:
-                      - type: string
-                      - oneOf:
-                          - $ref: '#/components/schemas/TradesParams'
-                          - $ref: '#/components/schemas/HistoryFilterParams'
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
-              required:
-                - args
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: start
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Start of the time range
+        - in: query
+          name: end
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: End of the time range
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+          description: Maximum number of results to return
       responses:
         '200':
           description: Fetch Trades response
@@ -521,28 +759,16 @@ paths:
                         $ref: '#/components/schemas/Order'
       description: Cancel an existing open order.
   '/api/{exchange}/fetchOrder':
-    post:
+    get:
       summary: Fetch Order
       operationId: fetchOrder
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchOrderRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    type: string
-                  minItems: 1
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
-              required:
-                - args
+        - in: query
+          name: orderId
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Fetch Order response
@@ -557,25 +783,16 @@ paths:
                         $ref: '#/components/schemas/Order'
       description: Fetch a specific order by ID.
   '/api/{exchange}/fetchOpenOrders':
-    post:
+    get:
       summary: Fetch Open Orders
       operationId: fetchOpenOrders
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchOpenOrdersRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    type: string
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: marketId
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Fetch Open Orders response
@@ -592,25 +809,49 @@ paths:
                           $ref: '#/components/schemas/Order'
       description: 'Fetch all open orders, optionally filtered by market.'
   '/api/{exchange}/fetchMyTrades':
-    post:
+    get:
       summary: Fetch My Trades
       operationId: fetchMyTrades
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchMyTradesRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    $ref: '#/components/schemas/MyTradesParams'
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: outcomeId
+          required: false
+          schema:
+            type: string
+          description: filter to specific outcome/ticker
+        - in: query
+          name: marketId
+          required: false
+          schema:
+            type: string
+          description: filter to specific market
+        - in: query
+          name: since
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Only return records after this date
+        - in: query
+          name: until
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Only return records before this date
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+          description: Maximum number of results to return
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+          description: for Kalshi cursor pagination
       responses:
         '200':
           description: Fetch My Trades response
@@ -626,25 +867,43 @@ paths:
                         items:
                           $ref: '#/components/schemas/UserTrade'
   '/api/{exchange}/fetchClosedOrders':
-    post:
+    get:
       summary: Fetch Closed Orders
       operationId: fetchClosedOrders
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchClosedOrdersRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    $ref: '#/components/schemas/OrderHistoryParams'
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: marketId
+          required: false
+          schema:
+            type: string
+          description: required for Limitless (slug)
+        - in: query
+          name: since
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Only return records after this date
+        - in: query
+          name: until
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Only return records before this date
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+          description: Maximum number of results to return
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+          description: Opaque pagination cursor from a previous response
       responses:
         '200':
           description: Fetch Closed Orders response
@@ -660,25 +919,43 @@ paths:
                         items:
                           $ref: '#/components/schemas/Order'
   '/api/{exchange}/fetchAllOrders':
-    post:
+    get:
       summary: Fetch All Orders
       operationId: fetchAllOrders
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchAllOrdersRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    $ref: '#/components/schemas/OrderHistoryParams'
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: marketId
+          required: false
+          schema:
+            type: string
+          description: required for Limitless (slug)
+        - in: query
+          name: since
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Only return records after this date
+        - in: query
+          name: until
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Only return records before this date
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+          description: Maximum number of results to return
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+          description: Opaque pagination cursor from a previous response
       responses:
         '200':
           description: Fetch All Orders response
@@ -694,25 +971,16 @@ paths:
                         items:
                           $ref: '#/components/schemas/Order'
   '/api/{exchange}/fetchPositions':
-    post:
+    get:
       summary: Fetch Positions
       operationId: fetchPositions
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchPositionsRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    type: string
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: address
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Fetch Positions response
@@ -729,25 +997,16 @@ paths:
                           $ref: '#/components/schemas/Position'
       description: Fetch current user positions across all markets.
   '/api/{exchange}/fetchBalance':
-    post:
+    get:
       summary: Fetch Balance
       operationId: fetchBalance
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              title: FetchBalanceRequest
-              type: object
-              properties:
-                args:
-                  type: array
-                  maxItems: 1
-                  items:
-                    type: string
-                credentials:
-                  $ref: '#/components/schemas/ExchangeCredentials'
+        - in: query
+          name: address
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Fetch Balance response
@@ -871,10 +1130,97 @@ paths:
                       - type: array
                         items:
                           $ref: '#/components/schemas/UnifiedMarket'
-                      - oneOf:
-                          - type: string
-                          - type: object
-                          - type: object
+                      - type: string
+                      - type: object
+                        properties:
+                          text:
+                            type: string
+                          searchIn:
+                            type: array
+                            items:
+                              type: string
+                              enum:
+                                - title
+                                - description
+                                - category
+                                - tags
+                                - outcomes
+                          volume24h:
+                            type: object
+                            properties:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                          volume:
+                            type: object
+                            properties:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                          liquidity:
+                            type: object
+                            properties:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                          openInterest:
+                            type: object
+                            properties:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                          resolutionDate:
+                            type: object
+                            properties:
+                              before:
+                                type: string
+                                format: date-time
+                              after:
+                                type: string
+                                format: date-time
+                          category:
+                            type: string
+                          tags:
+                            type: array
+                            items:
+                              type: string
+                          price:
+                            type: object
+                            properties:
+                              outcome:
+                                type: string
+                                enum:
+                                  - 'yes'
+                                  - 'no'
+                                  - up
+                                  - down
+                              min:
+                                type: number
+                              max:
+                                type: number
+                            required:
+                              - outcome
+                          priceChange24h:
+                            type: object
+                            properties:
+                              outcome:
+                                type: string
+                                enum:
+                                  - 'yes'
+                                  - 'no'
+                                  - up
+                                  - down
+                              min:
+                                type: number
+                              max:
+                                type: number
+                            required:
+                              - outcome
+                      - type: object
                 credentials:
                   $ref: '#/components/schemas/ExchangeCredentials'
               required:
@@ -918,10 +1264,41 @@ paths:
                       - type: array
                         items:
                           $ref: '#/components/schemas/UnifiedEvent'
-                      - oneOf:
-                          - type: string
-                          - type: object
-                          - type: object
+                      - type: string
+                      - type: object
+                        properties:
+                          text:
+                            type: string
+                          searchIn:
+                            type: array
+                            items:
+                              type: string
+                              enum:
+                                - title
+                                - description
+                                - category
+                                - tags
+                          category:
+                            type: string
+                          tags:
+                            type: array
+                            items:
+                              type: string
+                          marketCount:
+                            type: object
+                            properties:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                          totalVolume:
+                            type: object
+                            properties:
+                              min:
+                                type: number
+                              max:
+                                type: number
+                      - type: object
                 credentials:
                   $ref: '#/components/schemas/ExchangeCredentials'
               required:
@@ -1184,40 +1561,53 @@ components:
         marketId:
           type: string
           description: The unique identifier for this market
+        eventId:
+          type: string
+          description: Link to parent event
         title:
           type: string
+          description: 'The market title (e.g., "Will BTC close above $100k on Dec 31?").'
         description:
           type: string
+          description: Long-form market description or resolution criteria.
         slug:
           type: string
+          description: URL-friendly slug for the market.
         outcomes:
           type: array
           items:
             $ref: '#/components/schemas/MarketOutcome'
-        eventId:
-          type: string
-          description: Link to parent event
+          description: The possible outcomes for this market.
         resolutionDate:
           type: string
           format: date-time
+          description: When the market is scheduled to resolve.
         volume24h:
           type: number
+          description: Trading volume over the past 24 hours (USD).
         volume:
           type: number
+          description: Total / Lifetime volume
         liquidity:
           type: number
+          description: Current market liquidity (USD).
         openInterest:
           type: number
+          description: Total value of outstanding contracts (USD).
         url:
           type: string
+          description: Canonical URL to view the market on the venue.
         image:
           type: string
+          description: Optional image URL for the market.
         category:
           type: string
+          description: 'Optional category label (e.g., "Politics", "Crypto").'
         tags:
           type: array
           items:
             type: string
+          description: Optional list of tags associated with the market.
         tickSize:
           type: number
           description: 'Minimum price increment (e.g., 0.01, 0.001)'
@@ -1228,13 +1618,30 @@ components:
           type: string
           description: 'On-chain contract / condition identifier where applicable (Polymarket conditionId, etc.).'
         'yes':
-          $ref: '#/components/schemas/MarketOutcome'
+          allOf:
+            - $ref: '#/components/schemas/MarketOutcome'
+          description: Convenience accessor for the YES outcome on a binary market.
         'no':
-          $ref: '#/components/schemas/MarketOutcome'
+          allOf:
+            - $ref: '#/components/schemas/MarketOutcome'
+          description: Convenience accessor for the NO outcome on a binary market.
         up:
-          $ref: '#/components/schemas/MarketOutcome'
+          allOf:
+            - $ref: '#/components/schemas/MarketOutcome'
+          description: Convenience accessor for the UP outcome on a binary market.
         down:
-          $ref: '#/components/schemas/MarketOutcome'
+          allOf:
+            - $ref: '#/components/schemas/MarketOutcome'
+          description: Convenience accessor for the DOWN outcome on a binary market.
+      required:
+        - marketId
+        - title
+        - description
+        - outcomes
+        - resolutionDate
+        - volume24h
+        - liquidity
+        - url
     MarketOutcome:
       type: object
       properties:
@@ -1243,63 +1650,100 @@ components:
           description: 'Outcome ID for trading operations (CLOB Token ID for Polymarket, Market Ticker for Kalshi)'
         marketId:
           type: string
-          description: The market this outcome belongs to (set automatically)
+          description: The market this outcome belongs to (set automatically when outcomes are built)
         label:
           type: string
+          description: 'Human-readable outcome label (e.g., "Yes", "No", candidate name).'
         price:
           type: number
+          description: Probability between 0.0 and 1.0.
         priceChange24h:
           type: number
+          description: 'Change in price over the past 24 hours, as an absolute probability delta.'
         metadata:
           type: object
-          additionalProperties: true
+          additionalProperties: {}
           description: 'Exchange-specific metadata (e.g., clobTokenId for Polymarket)'
+      required:
+        - outcomeId
+        - label
+        - price
     UnifiedEvent:
       type: object
-      description: 'A grouped collection of related markets (e.g., "Who will be Fed Chair?" contains multiple candidate markets)'
+      description: 'A grouped collection of related markets (e.g., "Who will be Fed Chair?" contains multiple candidate markets).'
       properties:
         id:
           type: string
+          description: The unique identifier for this event.
         title:
           type: string
+          description: 'The event title (e.g., "Who will be Fed Chair?").'
         description:
           type: string
+          description: Long-form event description.
         slug:
           type: string
+          description: URL-friendly slug for the event.
         markets:
           type: array
           items:
             $ref: '#/components/schemas/UnifiedMarket'
+          description: Markets grouped under this event.
         volume24h:
           type: number
+          description: Trading volume over the past 24 hours (USD).
         volume:
           type: number
           description: Total / Lifetime volume (sum across markets; undefined if no market provides it)
         url:
           type: string
+          description: Canonical URL to view the event on the venue.
         image:
           type: string
+          description: Optional image URL for the event.
         category:
           type: string
+          description: 'Optional category label (e.g., "Politics", "Sports").'
         tags:
           type: array
           items:
             type: string
+          description: Optional list of tags associated with the event.
+      required:
+        - id
+        - title
+        - description
+        - slug
+        - markets
+        - volume24h
+        - url
     PriceCandle:
       type: object
       properties:
         timestamp:
-          type: integer
+          type: number
+          description: Unix timestamp in milliseconds marking the start of the candle.
         open:
           type: number
+          description: Opening price for the interval (probability between 0.0 and 1.0).
         high:
           type: number
+          description: Highest price during the interval (probability between 0.0 and 1.0).
         low:
           type: number
+          description: Lowest price during the interval (probability between 0.0 and 1.0).
         close:
           type: number
+          description: Closing price for the interval (probability between 0.0 and 1.0).
         volume:
           type: number
+          description: Trading volume during the interval.
+      required:
+        - timestamp
+        - open
+        - high
+        - low
+        - close
     OrderBook:
       type: object
       properties:
@@ -1307,82 +1751,125 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderLevel'
+          description: 'Order book bid levels, sorted by price descending.'
         asks:
           type: array
           items:
             $ref: '#/components/schemas/OrderLevel'
+          description: 'Order book ask levels, sorted by price ascending.'
         timestamp:
-          type: integer
+          type: number
+          description: Unix timestamp in milliseconds when the snapshot was taken.
+      required:
+        - bids
+        - asks
     OrderLevel:
       type: object
       properties:
         price:
           type: number
+          description: 0.0 to 1.0 (probability)
         size:
           type: number
+          description: contracts/shares
+      required:
+        - price
+        - size
     Trade:
       type: object
       properties:
         id:
           type: string
+          description: The unique identifier for this trade.
+        timestamp:
+          type: number
+          description: Unix timestamp in milliseconds when the trade executed.
         price:
           type: number
+          description: Probability between 0.0 and 1.0.
         amount:
           type: number
+          description: Size of the trade in contracts/shares.
         side:
           type: string
           enum:
             - buy
             - sell
             - unknown
-        timestamp:
-          type: integer
+          description: Trade side from the taker's perspective.
+        outcomeId:
+          type: string
+          description: The outcome this trade is for (if known).
+      required:
+        - id
+        - timestamp
+        - price
+        - amount
+        - side
     UserTrade:
       type: object
       properties:
         id:
           type: string
+          description: The unique identifier for this trade.
+        timestamp:
+          type: number
+          description: Unix timestamp in milliseconds when the trade executed.
         price:
           type: number
+          description: Probability between 0.0 and 1.0.
         amount:
           type: number
+          description: Size of the trade in contracts/shares.
         side:
           type: string
           enum:
             - buy
             - sell
             - unknown
-        timestamp:
-          type: integer
-        orderId:
-          type: string
+          description: Trade side from the taker's perspective.
         outcomeId:
           type: string
-        marketId:
+          description: The outcome this trade is for (if known).
+        orderId:
           type: string
+          description: 'The order that produced this trade, if known.'
+      required:
+        - id
+        - timestamp
+        - price
+        - amount
+        - side
     Order:
       type: object
       properties:
         id:
           type: string
+          description: The exchange-assigned order identifier.
         marketId:
           type: string
+          description: The market this order was placed on.
         outcomeId:
           type: string
+          description: The outcome this order was placed on.
         side:
           type: string
           enum:
             - buy
             - sell
+          description: 'Order side: buy or sell.'
         type:
           type: string
           enum:
-            - limit
             - market
+            - limit
+          description: 'Order type: market (execute immediately) or limit (resting at a price).'
         price:
           type: number
+          description: For limit orders
         amount:
           type: number
+          description: Size in contracts/shares
         status:
           type: string
           enum:
@@ -1391,44 +1878,85 @@ components:
             - filled
             - cancelled
             - rejected
+          description: Lifecycle status of the order.
         filled:
           type: number
+          description: Amount filled
         remaining:
           type: number
+          description: Amount remaining
         timestamp:
-          type: integer
+          type: number
+          description: Unix timestamp in milliseconds when the order was created.
         fee:
           type: number
+          description: 'Fee paid for this order, if known.'
+      required:
+        - id
+        - marketId
+        - outcomeId
+        - side
+        - type
+        - amount
+        - status
+        - filled
+        - remaining
+        - timestamp
     Position:
       type: object
       properties:
         marketId:
           type: string
+          description: The market this position is held in.
         outcomeId:
           type: string
+          description: The outcome this position is held in.
         outcomeLabel:
           type: string
+          description: Human-readable label for the outcome held.
         size:
           type: number
+          description: 'Positive for long, negative for short'
         entryPrice:
           type: number
+          description: Average entry price for the position (probability between 0.0 and 1.0).
         currentPrice:
           type: number
+          description: Current mark price for the position (probability between 0.0 and 1.0).
         unrealizedPnL:
           type: number
+          description: Unrealized profit or loss at the current price (USD).
         realizedPnL:
           type: number
+          description: Realized profit or loss booked so far (USD).
+      required:
+        - marketId
+        - outcomeId
+        - outcomeLabel
+        - size
+        - entryPrice
+        - currentPrice
+        - unrealizedPnL
     Balance:
       type: object
       properties:
         currency:
           type: string
+          description: 'e.g., ''USDC'''
         total:
           type: number
+          description: Total balance including funds locked in open orders.
         available:
           type: number
+          description: Balance available to trade (excludes locked funds).
         locked:
           type: number
+          description: In open orders
+      required:
+        - currency
+        - total
+        - available
+        - locked
     ExecutionPriceResult:
       type: object
       properties:
@@ -1438,48 +1966,65 @@ components:
           type: number
         fullyFilled:
           type: boolean
+      required:
+        - price
+        - filledAmount
+        - fullyFilled
     PaginatedMarketsResult:
       type: object
+      description: Shape returned by fetchMarketsPaginated
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/UnifiedMarket'
+          description: The page of unified markets
         total:
-          type: integer
+          type: number
+          description: Total number of markets in the snapshot
         nextCursor:
           type: string
+          description: 'Cursor to pass to the next call, or undefined if this is the last page'
+      required:
+        - data
+        - total
     MarketFilterParams:
       type: object
       properties:
         limit:
-          type: integer
-          default: 10000
+          type: number
+          description: Maximum number of results to return
         offset:
-          type: integer
+          type: number
+          description: Pagination offset — number of results to skip
         sort:
           type: string
           enum:
             - volume
             - liquidity
             - newest
+          description: Sort order for results
         status:
           type: string
           enum:
             - active
+            - inactive
             - closed
             - all
-          description: 'Filter by market status (default: active)'
+          description: 'Filter by market status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
         searchIn:
           type: string
           enum:
             - title
             - description
             - both
+          description: 'Where to search (default: ''title'')'
         query:
           type: string
+          description: For keyword search
         slug:
           type: string
+          description: For slug/ticker lookup
         marketId:
           type: string
           description: Direct lookup by market ID
@@ -1490,38 +2035,45 @@ components:
           type: string
           description: Find markets belonging to an event
         page:
-          type: integer
+          type: number
+          description: For pagination (used by Limitless)
         similarityThreshold:
           type: number
+          description: For semantic search (used by Limitless)
     EventFetchParams:
       type: object
       properties:
         query:
           type: string
+          description: For keyword search
+        limit:
+          type: number
+          description: Maximum number of results to return
+        offset:
+          type: number
+          description: Pagination offset — number of results to skip
         sort:
           type: string
           enum:
             - volume
             - liquidity
             - newest
-        limit:
-          type: integer
-          default: 10000
-        offset:
-          type: integer
+          description: Sort order for results
         status:
           type: string
           enum:
             - active
+            - inactive
             - closed
             - all
-          description: 'Filter by event status (default: active)'
+          description: 'Filter by event status (default: ''active'', ''inactive'' and ''closed'' are interchangeable)'
         searchIn:
           type: string
           enum:
             - title
             - description
             - both
+          description: 'Where to search (default: ''title'')'
         eventId:
           type: string
           description: Direct lookup by event ID
@@ -1541,18 +2093,20 @@ components:
             - 1h
             - 6h
             - 1d
+          description: Optional for backward compatibility
         start:
           type: string
           format: date-time
+          description: Start of the time range
         end:
           type: string
           format: date-time
+          description: End of the time range
         limit:
-          type: integer
+          type: number
+          description: Maximum number of results to return
     OHLCVParams:
       type: object
-      required:
-        - resolution
       properties:
         resolution:
           type: string
@@ -1563,15 +2117,20 @@ components:
             - 1h
             - 6h
             - 1d
-          description: Candle interval for aggregation
+          description: Required for candle aggregation
         start:
           type: string
           format: date-time
+          description: Start of the time range
         end:
           type: string
           format: date-time
+          description: End of the time range
         limit:
-          type: integer
+          type: number
+          description: Maximum number of results to return
+      required:
+        - resolution
     TradesParams:
       type: object
       description: Parameters for fetching trade history. No resolution parameter - trades are discrete events.
@@ -1579,62 +2138,72 @@ components:
         start:
           type: string
           format: date-time
+          description: Start of the time range
         end:
           type: string
           format: date-time
+          description: End of the time range
         limit:
-          type: integer
+          type: number
+          description: Maximum number of results to return
     CreateOrderParams:
       type: object
-      required:
-        - marketId
-        - outcomeId
-        - side
-        - type
-        - amount
       properties:
         marketId:
           type: string
+          description: The market to trade on.
         outcomeId:
           type: string
+          description: The outcome to trade.
         side:
           type: string
           enum:
             - buy
             - sell
+          description: 'Order side: buy or sell.'
         type:
           type: string
           enum:
-            - limit
             - market
+            - limit
+          description: 'Order type: market (execute immediately) or limit (resting at a price).'
         amount:
           type: number
+          description: Size of the order in contracts/shares.
         price:
           type: number
+          description: Required for limit orders
         fee:
           type: number
+          description: 'Optional fee rate (e.g., 1000 for 0.1%)'
         tickSize:
           type: number
           description: Optional override for Limitless/Polymarket
         negRisk:
           type: boolean
           description: Optional override to skip neg-risk lookup (Polymarket)
+      required:
+        - marketId
+        - outcomeId
+        - side
+        - type
+        - amount
     BuiltOrder:
       type: object
-      description: 'An order built but not yet submitted, ready for inspection or middleware forwarding'
       properties:
         exchange:
           type: string
-          description: The exchange name this order was built for
+          description: The exchange name this order was built for.
         params:
-          $ref: '#/components/schemas/CreateOrderParams'
+          allOf:
+            - $ref: '#/components/schemas/CreateOrderParams'
+          description: The original params used to build this order.
         signedOrder:
           type: object
-          additionalProperties: true
-          description: 'For CLOB exchanges (Polymarket): the EIP-712 signed order ready to POST'
+          additionalProperties: {}
+          description: 'For CLOB exchanges (Polymarket): the EIP-712 signed order ready to POST to the exchange''s order endpoint.'
         tx:
           type: object
-          description: 'For on-chain AMM exchanges: the EVM transaction payload (reserved for future use)'
           properties:
             to:
               type: string
@@ -1643,66 +2212,87 @@ components:
             value:
               type: string
             chainId:
-              type: integer
+              type: number
+          required:
+            - to
+            - data
+            - value
+            - chainId
+          description: >-
+            For on-chain AMM exchanges: the EVM transaction payload. Reserved for future exchanges; no current exchange
+            populates this.
         raw:
           description: 'The raw, exchange-native payload. Always present.'
+      required:
+        - exchange
+        - params
+        - raw
     MyTradesParams:
       type: object
       properties:
         outcomeId:
           type: string
-          description: Filter to specific outcome/ticker
+          description: filter to specific outcome/ticker
         marketId:
           type: string
-          description: Filter to specific market
+          description: filter to specific market
         since:
           type: string
           format: date-time
+          description: Only return records after this date
         until:
           type: string
           format: date-time
+          description: Only return records before this date
         limit:
-          type: integer
+          type: number
+          description: Maximum number of results to return
         cursor:
           type: string
-          description: For Kalshi cursor pagination
+          description: for Kalshi cursor pagination
     OrderHistoryParams:
       type: object
       properties:
         marketId:
           type: string
-          description: Required for Limitless (slug)
+          description: required for Limitless (slug)
         since:
           type: string
           format: date-time
+          description: Only return records after this date
         until:
           type: string
           format: date-time
+          description: Only return records before this date
         limit:
-          type: integer
+          type: number
+          description: Maximum number of results to return
         cursor:
           type: string
+          description: Opaque pagination cursor from a previous response
     ExchangeCredentials:
       type: object
-      description: Optional authentication credentials for exchange operations
+      description: Optional authentication credentials for exchange operations.
       properties:
         apiKey:
           type: string
-          description: API key for the exchange
-        privateKey:
-          type: string
-          description: Private key for signing transactions
         apiSecret:
           type: string
-          description: API secret (if required by exchange)
+          description: Standard API secret for HMAC-authenticated exchanges
         passphrase:
           type: string
-          description: Passphrase (if required by exchange)
-        funderAddress:
+          description: Standard API passphrase for HMAC-authenticated exchanges
+        apiToken:
           type: string
-          description: The address funding the trades (Proxy address)
+          description: 'Metaculus: `Authorization: Token <apiToken>` for higher rate limits'
+        privateKey:
+          type: string
+          description: Required for Polymarket L1 auth
         signatureType:
           oneOf:
-            - type: integer
+            - type: number
             - type: string
-          description: 'Signature type (0=EOA, 1=Poly Proxy, 2=Gnosis Safe, or names like ''gnosis_safe'')'
+          description: '0 = EOA, 1 = Poly Proxy, 2 = Gnosis Safe (Can also use ''eoa'', ''polyproxy'', ''gnosis_safe'')'
+        funderAddress:
+          type: string
+          description: The address funding the trades (defaults to signer address)

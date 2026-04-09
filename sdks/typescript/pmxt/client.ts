@@ -10,8 +10,6 @@ import {
     CreateOrderRequest,
     DefaultApi,
     ExchangeCredentials,
-    FetchOHLCVRequest,
-    FetchTradesRequest,
     BuildOrderRequest,
     SubmitOrderRequest,
 } from "../generated/src/index.js";
@@ -44,6 +42,7 @@ import {
 import { ServerManager } from "./server-manager.js";
 import { buildArgsWithOptionalOptions } from "./args.js";
 import { PmxtError, fromServerError } from "./errors.js";
+import { LOCAL_URL, resolvePmxtBaseUrl } from "./constants.js";
 
 /**
  * Resolve a MarketOutcome shorthand to a plain outcome ID string.
@@ -52,6 +51,47 @@ import { PmxtError, fromServerError } from "./errors.js";
 function resolveOutcomeId(input: string | MarketOutcome): string {
     if (typeof input === 'string') return input;
     return input.outcomeId;
+}
+
+/**
+ * Build a URL-encoded query string from a plain record.
+ *
+ * - `undefined` / `null` values are skipped (they shouldn't appear in the URL).
+ * - Arrays are serialised as repeated `key=v1&key=v2` pairs.
+ * - Nested objects are skipped here; callers should route such queries through
+ *   POST instead (see `queryHasNestedObject`).
+ */
+function buildSidecarQueryString(query: Record<string, unknown>): string {
+    const parts: string[] = [];
+    for (const [key, value] of Object.entries(query)) {
+        if (value === undefined || value === null) continue;
+        if (Array.isArray(value)) {
+            for (const v of value) {
+                if (v === undefined || v === null) continue;
+                parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`);
+            }
+        } else if (typeof value === 'object') {
+            // Nested objects don't round-trip through query strings. Caller
+            // should have detected this and POSTed instead.
+            continue;
+        } else {
+            parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+        }
+    }
+    return parts.join('&');
+}
+
+/**
+ * True if any top-level value in the query is a nested object (not an array).
+ * Such queries can't be safely expressed in a query string, so we fall back
+ * to POST to preserve the original argument shape.
+ */
+function queryHasNestedObject(query: Record<string, unknown>): boolean {
+    for (const value of Object.values(query)) {
+        if (value === undefined || value === null) continue;
+        if (typeof value === 'object' && !Array.isArray(value)) return true;
+    }
+    return false;
 }
 
 // Converter functions
@@ -232,16 +272,43 @@ function convertSubscriptionSnapshot(raw: any): SubscribedAddressSnapshot {
  * Base exchange client options.
  */
 export interface ExchangeOptions {
-    /** API key for authentication (optional) */
+    /** Venue-specific API key (e.g. Polymarket CLOB key). Optional. */
     apiKey?: string;
 
-    /** Private key for authentication (optional) */
+    /** Venue-specific private key. Optional. */
     privateKey?: string;
 
-    /** Base URL of the PMXT sidecar server */
+    /**
+     * Hosted pmxt API key.
+     *
+     * When set (either as this kwarg or via the `PMXT_API_KEY` env
+     * variable), and no explicit `baseUrl` / `PMXT_BASE_URL` is set,
+     * the Exchange will default to the hosted pmxt endpoint
+     * (`https://api.pmxt.dev`) instead of the local sidecar, and send
+     * `Authorization: Bearer <pmxtApiKey>` on every request.
+     *
+     * The local sidecar ignores this header, so it is safe to set in
+     * both local and hosted modes.
+     */
+    pmxtApiKey?: string;
+
+    /**
+     * Base URL of the pmxt server.
+     *
+     * Resolution precedence:
+     *   1. Explicit `baseUrl` kwarg.
+     *   2. `PMXT_BASE_URL` environment variable.
+     *   3. `HOSTED_URL` when `pmxtApiKey` (kwarg or env) is present.
+     *   4. Local sidecar (`http://localhost:3847`).
+     */
     baseUrl?: string;
 
-    /** Automatically start server if not running (default: true) */
+    /**
+     * Automatically start the local sidecar if it is not running.
+     *
+     * Default: `true` when the resolved base URL is the local sidecar,
+     * `false` otherwise. Explicit `true` / `false` always wins.
+     */
     autoStartServer?: boolean;
 
     /** Optional Polymarket Proxy/Smart Wallet address */
@@ -261,12 +328,22 @@ export abstract class Exchange {
     protected exchangeName: string;
     protected apiKey?: string;
     protected privateKey?: string;
+    protected pmxtApiKey?: string;
     protected proxyAddress?: string;
     protected signatureType?: number;
     protected api: DefaultApi;
     protected config: Configuration;
     protected serverManager: ServerManager;
     protected initPromise: Promise<void>;
+    protected isHosted: boolean;
+
+    /**
+     * Sticky flag: set to `true` the first time a GET read is rejected by
+     * the sidecar with 404/405 (i.e. an older pmxt-core that only supports
+     * POST). While false, read methods try GET first; once flipped they
+     * POST directly and skip the GET probe for the lifetime of this client.
+     */
+    private _getReadsUnsupported: boolean = false;
 
     constructor(exchangeName: string, options: ExchangeOptions = {}) {
         this.exchangeName = exchangeName.toLowerCase();
@@ -275,13 +352,29 @@ export abstract class Exchange {
         this.proxyAddress = options.proxyAddress;
         this.signatureType = options.signatureType;
 
-        let baseUrl = options.baseUrl || "http://localhost:3847";
-        const autoStartServer = options.autoStartServer !== false;
+        // Resolve base URL + hosted API key via the shared precedence
+        // rules. See constants.ts for the full resolution table.
+        const resolved = resolvePmxtBaseUrl({
+            baseUrl: options.baseUrl,
+            pmxtApiKey: options.pmxtApiKey,
+        });
+        const baseUrl = resolved.baseUrl;
+        this.pmxtApiKey = resolved.pmxtApiKey;
+        this.isHosted = resolved.isHosted;
 
-        // Initialize server manager
+        // auto_start_server defaults: true for local, false for hosted.
+        // An explicit value in the options always wins.
+        const autoStartServer = options.autoStartServer !== undefined
+            ? options.autoStartServer
+            : !this.isHosted;
+
+        // Initialize server manager (no network calls happen here — the
+        // constructor just stores config).
         this.serverManager = new ServerManager({ baseUrl });
 
-        // Configure the API client with the initial base URL (will be updated if port changes)
+        // Configure the API client with the initial base URL (will be
+        // updated to the actual listen port if the local sidecar gets
+        // bumped off the default).
         this.config = new Configuration({ basePath: baseUrl });
         this.api = new DefaultApi(this.config);
 
@@ -339,10 +432,22 @@ export abstract class Exchange {
 
     protected getAuthHeaders(): Record<string, string> {
         const headers: Record<string, string> = { ...(this.config.headers as Record<string, string>) };
+
+        // Local sidecar access token (read from the lock file). Only
+        // meaningful when talking to a local sidecar we spawned
+        // ourselves; harmless elsewhere.
         const accessToken = this.serverManager.getAccessToken();
         if (accessToken) {
             headers['x-pmxt-access-token'] = accessToken;
         }
+
+        // Hosted pmxt bearer token. The hosted service requires this;
+        // the local sidecar ignores it. Safe to attach unconditionally
+        // whenever a pmxtApiKey has been resolved.
+        if (this.pmxtApiKey) {
+            headers['Authorization'] = `Bearer ${this.pmxtApiKey}`;
+        }
+
         return headers;
     }
 
@@ -398,6 +503,75 @@ export abstract class Exchange {
         }
     }
 
+    /**
+     * Dispatch a sidecar read method, preferring GET but transparently
+     * falling back to POST for full backward compatibility.
+     *
+     * GET is used when:
+     *   - the client has no per-instance credentials (the sidecar's GET
+     *     handler intentionally drops credentials to avoid leaking them
+     *     through query strings and access logs), and
+     *   - the sidecar hasn't already returned 404/405 for a previous GET
+     *     in this client's lifetime (`_getReadsUnsupported`), and
+     *   - the query has no nested objects (query strings can't round-trip
+     *     arbitrary JSON).
+     *
+     * Otherwise (or if the GET attempt is rejected with 404/405) the call
+     * is sent as POST with the original `{args, credentials}` body so that
+     * SDK users talking to an older pmxt-core continue to work unchanged.
+     *
+     * @internal — shared transport used by every generated read method.
+     */
+    protected async sidecarReadRequest(
+        methodName: string,
+        query: Record<string, unknown>,
+        args: unknown[],
+    ): Promise<any> {
+        const baseUrl = `${this.config.basePath}/api/${this.exchangeName}/${methodName}`;
+        const hasCredentials = this.getCredentials() !== undefined;
+
+        if (!hasCredentials && !this._getReadsUnsupported && !queryHasNestedObject(query)) {
+            const qs = buildSidecarQueryString(query);
+            const getUrl = qs ? `${baseUrl}?${qs}` : baseUrl;
+            const response = await fetch(getUrl, {
+                method: 'GET',
+                headers: this.getAuthHeaders(),
+            });
+
+            // 404 / 405 => older sidecar without GET dispatch. Remember
+            // the downgrade so future calls skip the probe, and fall
+            // through to POST below.
+            if (response.status === 404 || response.status === 405) {
+                await response.text().catch(() => undefined);
+                this._getReadsUnsupported = true;
+            } else {
+                if (!response.ok) {
+                    const body = await response.json().catch(() => ({}));
+                    if (body.error && typeof body.error === "object") {
+                        throw fromServerError(body.error);
+                    }
+                    throw new PmxtError(body.error?.message || response.statusText);
+                }
+                return response.json();
+            }
+        }
+
+        // POST fallback — identical to the original per-method template.
+        const response = await fetch(baseUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
+            body: JSON.stringify({ args, credentials: this.getCredentials() }),
+        });
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            if (body.error && typeof body.error === "object") {
+                throw fromServerError(body.error);
+            }
+            throw new PmxtError(body.error?.message || response.statusText);
+        }
+        return response.json();
+    }
+
     // BEGIN GENERATED METHODS
 
     async loadMarkets(reload: boolean = false): Promise<Record<string, UnifiedMarket>> {
@@ -434,19 +608,8 @@ export abstract class Exchange {
         await this.initPromise;
         try {
             const args = buildArgsWithOptionalOptions(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchMarkets`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const query = { ...(params || {}) };
+            const json = await this.sidecarReadRequest('fetchMarkets', query, args);
             const data = this.handleResponse(json);
             return data.map(convertMarket);
         } catch (error) {
@@ -459,19 +622,8 @@ export abstract class Exchange {
         await this.initPromise;
         try {
             const args = buildArgsWithOptionalOptions(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchMarketsPaginated`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const query = { ...(params || {}) };
+            const json = await this.sidecarReadRequest('fetchMarketsPaginated', query, args);
             const data = this.handleResponse(json);
             return {
                 data: (data.data || []).map(convertMarket),
@@ -488,19 +640,8 @@ export abstract class Exchange {
         await this.initPromise;
         try {
             const args = buildArgsWithOptionalOptions(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchEvents`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const query = { ...(params || {}) };
+            const json = await this.sidecarReadRequest('fetchEvents', query, args);
             const data = this.handleResponse(json);
             return data.map(convertEvent);
         } catch (error) {
@@ -513,19 +654,8 @@ export abstract class Exchange {
         await this.initPromise;
         try {
             const args = buildArgsWithOptionalOptions(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchMarket`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const query = { ...(params || {}) };
+            const json = await this.sidecarReadRequest('fetchMarket', query, args);
             const data = this.handleResponse(json);
             return convertMarket(data);
         } catch (error) {
@@ -538,19 +668,8 @@ export abstract class Exchange {
         await this.initPromise;
         try {
             const args = buildArgsWithOptionalOptions(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchEvent`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const query = { ...(params || {}) };
+            const json = await this.sidecarReadRequest('fetchEvent', query, args);
             const data = this.handleResponse(json);
             return convertEvent(data);
         } catch (error) {
@@ -563,21 +682,9 @@ export abstract class Exchange {
         await this.initPromise;
         const resolvedId = resolveOutcomeId(id);
         try {
-            const args: any[] = [];
-            args.push(resolvedId);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchOrderBook`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const args: any[] = [resolvedId];
+            const query = { id: resolvedId };
+            const json = await this.sidecarReadRequest('fetchOrderBook', query, args);
             const data = this.handleResponse(json);
             return convertOrderBook(data);
         } catch (error) {
@@ -616,21 +723,9 @@ export abstract class Exchange {
     async fetchOrder(orderId: string): Promise<Order> {
         await this.initPromise;
         try {
-            const args: any[] = [];
-            args.push(orderId);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchOrder`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const args: any[] = [orderId];
+            const query = { orderId };
+            const json = await this.sidecarReadRequest('fetchOrder', query, args);
             const data = this.handleResponse(json);
             return convertOrder(data);
         } catch (error) {
@@ -643,19 +738,8 @@ export abstract class Exchange {
         await this.initPromise;
         try {
             const args = buildArgsWithOptionalOptions(marketId);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchOpenOrders`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const query = { marketId };
+            const json = await this.sidecarReadRequest('fetchOpenOrders', query, args);
             const data = this.handleResponse(json);
             return data.map(convertOrder);
         } catch (error) {
@@ -668,19 +752,8 @@ export abstract class Exchange {
         await this.initPromise;
         try {
             const args = buildArgsWithOptionalOptions(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchMyTrades`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const query = { ...(params || {}) };
+            const json = await this.sidecarReadRequest('fetchMyTrades', query, args);
             const data = this.handleResponse(json);
             return data.map(convertUserTrade);
         } catch (error) {
@@ -693,19 +766,8 @@ export abstract class Exchange {
         await this.initPromise;
         try {
             const args = buildArgsWithOptionalOptions(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchClosedOrders`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const query = { ...(params || {}) };
+            const json = await this.sidecarReadRequest('fetchClosedOrders', query, args);
             const data = this.handleResponse(json);
             return data.map(convertOrder);
         } catch (error) {
@@ -718,19 +780,8 @@ export abstract class Exchange {
         await this.initPromise;
         try {
             const args = buildArgsWithOptionalOptions(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchAllOrders`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const query = { ...(params || {}) };
+            const json = await this.sidecarReadRequest('fetchAllOrders', query, args);
             const data = this.handleResponse(json);
             return data.map(convertOrder);
         } catch (error) {
@@ -742,20 +793,9 @@ export abstract class Exchange {
     async fetchPositions(address?: string): Promise<Position[]> {
         await this.initPromise;
         try {
-            const args: any[] = address? [address] : [];
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchPositions`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const args: any[] = address ? [address] : [];
+            const query = { address };
+            const json = await this.sidecarReadRequest('fetchPositions', query, args);
             const data = this.handleResponse(json);
             return data.map(convertPosition);
         } catch (error) {
@@ -767,20 +807,9 @@ export abstract class Exchange {
     async fetchBalance(address?: string): Promise<Balance[]> {
         await this.initPromise;
         try {
-            const args: any[] = address? [address] : [];
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchBalance`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
+            const args: any[] = address ? [address] : [];
+            const query = { address };
+            const json = await this.sidecarReadRequest('fetchBalance', query, args);
             const data = this.handleResponse(json);
             return data.map(convertBalance);
         } catch (error) {
@@ -850,17 +879,10 @@ export abstract class Exchange {
                 paramsDict.limit = params.limit;
             }
 
-            const requestBody: FetchOHLCVRequest = {
-                args: [resolvedOutcomeId, paramsDict],
-                credentials: this.getCredentials()
-            };
-
-            const response = await this.api.fetchOHLCV({
-                exchange: this.exchangeName as any,
-                fetchOHLCVRequest: requestBody,
-            }, { headers: this.getAuthHeaders() });
-
-            const data = this.handleResponse(response);
+            const args = [resolvedOutcomeId, paramsDict];
+            const query = { id: resolvedOutcomeId, ...paramsDict };
+            const json = await this.sidecarReadRequest('fetchOHLCV', query, args);
+            const data = this.handleResponse(json);
             return data.map(convertCandle);
         } catch (error) {
             if (error instanceof PmxtError) throw error;
@@ -889,17 +911,10 @@ export abstract class Exchange {
                 paramsDict.limit = params.limit;
             }
 
-            const requestBody: FetchTradesRequest = {
-                args: [resolvedOutcomeId, paramsDict],
-                credentials: this.getCredentials()
-            };
-
-            const response = await this.api.fetchTrades({
-                exchange: this.exchangeName as any,
-                fetchTradesRequest: requestBody,
-            }, { headers: this.getAuthHeaders() });
-
-            const data = this.handleResponse(response);
+            const args = [resolvedOutcomeId, paramsDict];
+            const query = { id: resolvedOutcomeId, ...paramsDict };
+            const json = await this.sidecarReadRequest('fetchTrades', query, args);
+            const data = this.handleResponse(json);
             return data.map(convertTrade);
         } catch (error) {
             if (error instanceof PmxtError) throw error;

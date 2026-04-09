@@ -7,48 +7,78 @@ export interface MarketOutcome {
     outcomeId: string;
     /** The market this outcome belongs to (set automatically when outcomes are built) */
     marketId?: string;
+    /** Human-readable outcome label (e.g., "Yes", "No", candidate name). */
     label: string;
+    /** Probability between 0.0 and 1.0. */
     price: number;
+    /** Change in price over the past 24 hours, as an absolute probability delta. */
     priceChange24h?: number;
+    /** Exchange-specific metadata (e.g., clobTokenId for Polymarket) */
     metadata?: Record<string, any>;
 }
 
+/**
+ * A grouped collection of related markets (e.g., "Who will be Fed Chair?" contains multiple candidate markets).
+ */
 export interface UnifiedEvent {
+    /** The unique identifier for this event. */
     id: string;
+    /** The event title (e.g., "Who will be Fed Chair?"). */
     title: string;
+    /** Long-form event description. */
     description: string;
+    /** URL-friendly slug for the event. */
     slug: string;
+    /** Markets grouped under this event. */
     markets: UnifiedMarket[];
 
+    /** Trading volume over the past 24 hours (USD). */
     volume24h: number;
     volume?: number; // Total / Lifetime volume (sum across markets; undefined if no market provides it)
 
+    /** Canonical URL to view the event on the venue. */
     url: string;
+    /** Optional image URL for the event. */
     image?: string;
 
+    /** Optional category label (e.g., "Politics", "Sports"). */
     category?: string;
+    /** Optional list of tags associated with the event. */
     tags?: string[];
 }
 
 export interface UnifiedMarket {
     /** The unique identifier for this market */
     marketId: string;
+    /** Link to parent event */
     eventId?: string;
+    /** The market title (e.g., "Will BTC close above $100k on Dec 31?"). */
     title: string;
+    /** Long-form market description or resolution criteria. */
     description: string;
+    /** URL-friendly slug for the market. */
     slug?: string;
+    /** The possible outcomes for this market. */
     outcomes: MarketOutcome[];
 
+    /** When the market is scheduled to resolve. */
     resolutionDate: Date;
+    /** Trading volume over the past 24 hours (USD). */
     volume24h: number;
     volume?: number; // Total / Lifetime volume
+    /** Current market liquidity (USD). */
     liquidity: number;
+    /** Total value of outstanding contracts (USD). */
     openInterest?: number;
 
+    /** Canonical URL to view the market on the venue. */
     url: string;
+    /** Optional image URL for the market. */
     image?: string;
 
+    /** Optional category label (e.g., "Politics", "Crypto"). */
     category?: string;
+    /** Optional list of tags associated with the market. */
     tags?: string[];
     tickSize?: number; // Minimum price increment (e.g., 0.01, 0.001)
 
@@ -58,20 +88,30 @@ export interface UnifiedMarket {
     contractAddress?: string;
 
     // Convenience getters for binary markets
+    /** Convenience accessor for the YES outcome on a binary market. */
     yes?: MarketOutcome;
+    /** Convenience accessor for the NO outcome on a binary market. */
     no?: MarketOutcome;
+    /** Convenience accessor for the UP outcome on a binary market. */
     up?: MarketOutcome;
+    /** Convenience accessor for the DOWN outcome on a binary market. */
     down?: MarketOutcome;
 }
 
 export type CandleInterval = '1m' | '5m' | '15m' | '1h' | '6h' | '1d';
 
 export interface PriceCandle {
+    /** Unix timestamp in milliseconds marking the start of the candle. */
     timestamp: number;
+    /** Opening price for the interval (probability between 0.0 and 1.0). */
     open: number;
+    /** Highest price during the interval (probability between 0.0 and 1.0). */
     high: number;
+    /** Lowest price during the interval (probability between 0.0 and 1.0). */
     low: number;
+    /** Closing price for the interval (probability between 0.0 and 1.0). */
     close: number;
+    /** Trading volume during the interval. */
     volume?: number;
 }
 
@@ -81,27 +121,39 @@ export interface OrderLevel {
 }
 
 export interface OrderBook {
+    /** Order book bid levels, sorted by price descending. */
     bids: OrderLevel[];
+    /** Order book ask levels, sorted by price ascending. */
     asks: OrderLevel[];
+    /** Unix timestamp in milliseconds when the snapshot was taken. */
     timestamp?: number;
 }
 
 export interface Trade {
+    /** The unique identifier for this trade. */
     id: string;
+    /** Unix timestamp in milliseconds when the trade executed. */
     timestamp: number;
+    /** Probability between 0.0 and 1.0. */
     price: number;
+    /** Size of the trade in contracts/shares. */
     amount: number;
+    /** Trade side from the taker's perspective. */
     side: 'buy' | 'sell' | 'unknown';
+    /** The outcome this trade is for (if known). */
     outcomeId?: string;
 }
 
 export interface UserTrade extends Trade {
+    /** The order that produced this trade, if known. */
     orderId?: string;
 }
 
 
 export interface QueuedPromise<T> {
+    /** Internal: resolver for a queued promise. */
     resolve: (value: T | PromiseLike<T>) => void;
+    /** Internal: rejecter for a queued promise. */
     reject: (reason?: any) => void;
 }
 
@@ -110,43 +162,65 @@ export interface QueuedPromise<T> {
 // ----------------------------------------------------------------------------
 
 export interface Order {
+    /** The exchange-assigned order identifier. */
     id: string;
+    /** The market this order was placed on. */
     marketId: string;
+    /** The outcome this order was placed on. */
     outcomeId: string;
+    /** Order side: buy or sell. */
     side: 'buy' | 'sell';
+    /** Order type: market (execute immediately) or limit (resting at a price). */
     type: 'market' | 'limit';
     price?: number;  // For limit orders
     amount: number;  // Size in contracts/shares
+    /** Lifecycle status of the order. */
     status: 'pending' | 'open' | 'filled' | 'cancelled' | 'rejected';
     filled: number;  // Amount filled
     remaining: number;  // Amount remaining
+    /** Unix timestamp in milliseconds when the order was created. */
     timestamp: number;
+    /** Fee paid for this order, if known. */
     fee?: number;
 }
 
 export interface Position {
+    /** The market this position is held in. */
     marketId: string;
+    /** The outcome this position is held in. */
     outcomeId: string;
+    /** Human-readable label for the outcome held. */
     outcomeLabel: string;
     size: number;  // Positive for long, negative for short
+    /** Average entry price for the position (probability between 0.0 and 1.0). */
     entryPrice: number;
+    /** Current mark price for the position (probability between 0.0 and 1.0). */
     currentPrice: number;
+    /** Unrealized profit or loss at the current price (USD). */
     unrealizedPnL: number;
+    /** Realized profit or loss booked so far (USD). */
     realizedPnL?: number;
 }
 
 export interface Balance {
     currency: string;  // e.g., 'USDC'
+    /** Total balance including funds locked in open orders. */
     total: number;
+    /** Balance available to trade (excludes locked funds). */
     available: number;
     locked: number;  // In open orders
 }
 
 export interface CreateOrderParams {
+    /** The market to trade on. */
     marketId: string;
+    /** The outcome to trade. */
     outcomeId: string;
+    /** Order side: buy or sell. */
     side: 'buy' | 'sell';
+    /** Order type: market (execute immediately) or limit (resting at a price). */
     type: 'market' | 'limit';
+    /** Size of the order in contracts/shares. */
     amount: number;
     price?: number; // Required for limit orders
     fee?: number;   // Optional fee rate (e.g., 1000 for 0.1%)

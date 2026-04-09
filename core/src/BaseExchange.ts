@@ -23,27 +23,40 @@ import { Throttler } from './utils/throttler';
 // ----------------------------------------------------------------------------
 
 export interface ApiEndpoint {
+    /** HTTP verb for the endpoint (e.g. GET, POST). */
     method: string;
+    /** URL path template, relative to the descriptor's baseUrl. */
     path: string;
+    /** Whether this endpoint requires authenticated credentials. */
     isPrivate?: boolean;
+    /** Identifier used to generate the implicit API method name. */
     operationId?: string;
 }
 
 export interface ApiDescriptor {
+    /** Base URL that all endpoint paths are resolved against. */
     baseUrl: string;
+    /** Map of endpoint key to endpoint definition used by the implicit API machinery. */
     endpoints: Record<string, ApiEndpoint>;
 }
 
 export interface ImplicitApiMethodInfo {
+    /** Generated method name exposed on the exchange instance. */
     name: string;
+    /** HTTP verb for the underlying endpoint. */
     method: string;
+    /** URL path template for the underlying endpoint. */
     path: string;
+    /** Whether the underlying endpoint requires authenticated credentials. */
     isPrivate: boolean;
 }
 
 export interface MarketFilterParams {
+    /** Maximum number of results to return */
     limit?: number;
+    /** Pagination offset — number of results to skip */
     offset?: number;
+    /** Sort order for results */
     sort?: 'volume' | 'liquidity' | 'newest';
     status?: 'active' | 'inactive' | 'closed' | 'all'; // Filter by market status (default: 'active', 'inactive' and 'closed' are interchangeable)
     searchIn?: 'title' | 'description' | 'both'; // Where to search (default: 'title')
@@ -61,50 +74,76 @@ export interface MarketFetchParams extends MarketFilterParams {
 
 export interface EventFetchParams {
     query?: string;  // For keyword search
+    /** Maximum number of results to return */
     limit?: number;
+    /** Pagination offset — number of results to skip */
     offset?: number;
+    /** Sort order for results */
     sort?: 'volume' | 'liquidity' | 'newest';
     status?: 'active' | 'inactive' | 'closed' | 'all'; // Filter by event status (default: 'active', 'inactive' and 'closed' are interchangeable)
+    /** Where to search (default: 'title') */
     searchIn?: 'title' | 'description' | 'both';
     eventId?: string;    // Direct lookup by event ID
     slug?: string;       // Lookup by event slug
 }
 
+/**
+ * Deprecated - use OHLCVParams or TradesParams instead. Resolution is optional for backward compatibility.
+ */
 export interface HistoryFilterParams {
     resolution?: CandleInterval; // Optional for backward compatibility
+    /** Start of the time range */
     start?: Date;
+    /** End of the time range */
     end?: Date;
+    /** Maximum number of results to return */
     limit?: number;
 }
 
 export interface OHLCVParams {
     resolution: CandleInterval; // Required for candle aggregation
+    /** Start of the time range */
     start?: Date;
+    /** End of the time range */
     end?: Date;
+    /** Maximum number of results to return */
     limit?: number;
 }
 
+/**
+ * Parameters for fetching trade history. No resolution parameter - trades are discrete events.
+ */
 export interface TradesParams {
     // No resolution - trades are discrete events, not aggregated
+    /** Start of the time range */
     start?: Date;
+    /** End of the time range */
     end?: Date;
+    /** Maximum number of results to return */
     limit?: number;
 }
 
 export interface MyTradesParams {
     outcomeId?: string;  // filter to specific outcome/ticker
     marketId?: string;   // filter to specific market
+    /** Only return records after this date */
     since?: Date;
+    /** Only return records before this date */
     until?: Date;
+    /** Maximum number of results to return */
     limit?: number;
     cursor?: string;     // for Kalshi cursor pagination
 }
 
 export interface OrderHistoryParams {
     marketId?: string;   // required for Limitless (slug)
+    /** Only return records after this date */
     since?: Date;
+    /** Only return records before this date */
     until?: Date;
+    /** Maximum number of results to return */
     limit?: number;
+    /** Opaque pagination cursor from a previous response */
     cursor?: string;
 }
 
@@ -119,8 +158,11 @@ export type MarketFilterCriteria = {
 
     // Numeric range filters
     volume24h?: { min?: number; max?: number };
+    /** Filter by total (lifetime) volume range */
     volume?: { min?: number; max?: number };
+    /** Filter by current liquidity range */
     liquidity?: { min?: number; max?: number };
+    /** Filter by open interest range */
     openInterest?: { min?: number; max?: number };
 
     // Date filters
@@ -157,6 +199,7 @@ export type EventFilterCriteria = {
 
     // Category/tag filters
     category?: string;
+    /** Match events that have any of these tags */
     tags?: string[];
 
     // Filter by contained markets
@@ -173,32 +216,57 @@ export type EventFilterFunction = (event: UnifiedEvent) => boolean;
 export type ExchangeCapability = true | false | 'emulated';
 
 export interface ExchangeHas {
+    /** Whether this exchange supports fetching markets. */
     fetchMarkets: ExchangeCapability;
+    /** Whether this exchange supports fetching events. */
     fetchEvents: ExchangeCapability;
+    /** Whether this exchange supports fetching OHLCV candles. */
     fetchOHLCV: ExchangeCapability;
+    /** Whether this exchange supports fetching the order book. */
     fetchOrderBook: ExchangeCapability;
+    /** Whether this exchange supports fetching public trades. */
     fetchTrades: ExchangeCapability;
+    /** Whether this exchange supports creating orders. */
     createOrder: ExchangeCapability;
+    /** Whether this exchange supports cancelling orders. */
     cancelOrder: ExchangeCapability;
+    /** Whether this exchange supports fetching a single order by id. */
     fetchOrder: ExchangeCapability;
+    /** Whether this exchange supports fetching open orders. */
     fetchOpenOrders: ExchangeCapability;
+    /** Whether this exchange supports fetching account positions. */
     fetchPositions: ExchangeCapability;
+    /** Whether this exchange supports fetching account balances. */
     fetchBalance: ExchangeCapability;
+    /** Whether this exchange supports subscribing to an on-chain address for updates. */
     watchAddress: ExchangeCapability;
+    /** Whether this exchange supports unsubscribing from a watched address. */
     unwatchAddress: ExchangeCapability;
+    /** Whether this exchange supports streaming order book updates. */
     watchOrderBook: ExchangeCapability;
+    /** Whether this exchange supports streaming trade updates. */
     watchTrades: ExchangeCapability;
+    /** Whether this exchange supports fetching the authenticated user's trade history. */
     fetchMyTrades: ExchangeCapability;
+    /** Whether this exchange supports fetching closed orders. */
     fetchClosedOrders: ExchangeCapability;
+    /** Whether this exchange supports fetching all orders (open and closed). */
     fetchAllOrders: ExchangeCapability;
+    /** Whether this exchange supports building a signed order without submitting it. */
     buildOrder: ExchangeCapability;
+    /** Whether this exchange supports submitting a pre-built order. */
     submitOrder: ExchangeCapability;
 }
 
+/**
+ * Optional authentication credentials for exchange operations.
+ */
 export interface ExchangeCredentials {
     // Standard API authentication (Kalshi, etc.)
     apiKey?: string;
+    /** Standard API secret for HMAC-authenticated exchanges */
     apiSecret?: string;
+    /** Standard API passphrase for HMAC-authenticated exchanges */
     passphrase?: string;
     /** Metaculus: `Authorization: Token <apiToken>` for higher rate limits */
     apiToken?: string;
@@ -222,8 +290,11 @@ export interface ExchangeOptions {
 
 /** Shape returned by fetchMarketsPaginated */
 export interface PaginatedMarketsResult {
+    /** The page of unified markets */
     data: UnifiedMarket[];
+    /** Total number of markets in the snapshot */
     total: number;
+    /** Cursor to pass to the next call, or undefined if this is the last page */
     nextCursor?: string;
 }
 
