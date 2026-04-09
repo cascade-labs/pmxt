@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.27.1] - 2026-04-09
+
+### Fixed
+
+- **Broken 2.27.0 npm build**: `sdks/typescript/pmxt/client.ts` and `sdks/python/pmxt/client.py` imported from a `constants` module that was not committed in 2.27.0, causing `pmxtjs@2.27.0` to fail `tsc` with `TS2307: Cannot find module './constants.js'`. Python published cleanly only because CPython resolves imports at runtime, not at build time. This release commits the missing `sdks/typescript/pmxt/constants.ts` and `sdks/python/pmxt/constants.py` — self-contained modules exporting `HOSTED_URL`, `LOCAL_URL`, `ENV` names, and the `resolvePmxtBaseUrl` / `resolve_pmxt_base_url` helper that `client.ts` / `client.py` already referenced. No behaviour change beyond unbreaking the build.
+
 ## [2.27.0] - 2026-04-09
 
 ### Added
