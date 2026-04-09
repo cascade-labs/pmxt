@@ -78,11 +78,13 @@ paths:
           required: false
           schema:
             type: number
+          description: Maximum number of results to return
         - in: query
           name: offset
           required: false
           schema:
             type: number
+          description: Pagination offset — number of results to skip
         - in: query
           name: sort
           required: false
@@ -92,6 +94,7 @@ paths:
               - volume
               - liquidity
               - newest
+          description: Sort order for results
         - in: query
           name: status
           required: false
@@ -223,11 +226,13 @@ paths:
           required: false
           schema:
             type: number
+          description: Maximum number of results to return
         - in: query
           name: offset
           required: false
           schema:
             type: number
+          description: Pagination offset — number of results to skip
         - in: query
           name: sort
           required: false
@@ -237,6 +242,7 @@ paths:
               - volume
               - liquidity
               - newest
+          description: Sort order for results
         - in: query
           name: status
           required: false
@@ -257,6 +263,7 @@ paths:
               - title
               - description
               - both
+          description: 'Where to search (default: ''title'')'
         - in: query
           name: eventId
           required: false
@@ -297,11 +304,13 @@ paths:
           required: false
           schema:
             type: number
+          description: Maximum number of results to return
         - in: query
           name: offset
           required: false
           schema:
             type: number
+          description: Pagination offset — number of results to skip
         - in: query
           name: sort
           required: false
@@ -311,6 +320,7 @@ paths:
               - volume
               - liquidity
               - newest
+          description: Sort order for results
         - in: query
           name: status
           required: false
@@ -406,11 +416,13 @@ paths:
           required: false
           schema:
             type: number
+          description: Maximum number of results to return
         - in: query
           name: offset
           required: false
           schema:
             type: number
+          description: Pagination offset — number of results to skip
         - in: query
           name: sort
           required: false
@@ -420,6 +432,7 @@ paths:
               - volume
               - liquidity
               - newest
+          description: Sort order for results
         - in: query
           name: status
           required: false
@@ -440,6 +453,7 @@ paths:
               - title
               - description
               - both
+          description: 'Where to search (default: ''title'')'
         - in: query
           name: eventId
           required: false
@@ -497,17 +511,20 @@ paths:
           schema:
             type: string
             format: date-time
+          description: Start of the time range
         - in: query
           name: end
           required: false
           schema:
             type: string
             format: date-time
+          description: End of the time range
         - in: query
           name: limit
           required: false
           schema:
             type: number
+          description: Maximum number of results to return
       responses:
         '200':
           description: Fetch O H L C V response
@@ -566,17 +583,20 @@ paths:
           schema:
             type: string
             format: date-time
+          description: Start of the time range
         - in: query
           name: end
           required: false
           schema:
             type: string
             format: date-time
+          description: End of the time range
         - in: query
           name: limit
           required: false
           schema:
             type: number
+          description: Maximum number of results to return
       responses:
         '200':
           description: Fetch Trades response
@@ -812,17 +832,20 @@ paths:
           schema:
             type: string
             format: date-time
+          description: Only return records after this date
         - in: query
           name: until
           required: false
           schema:
             type: string
             format: date-time
+          description: Only return records before this date
         - in: query
           name: limit
           required: false
           schema:
             type: number
+          description: Maximum number of results to return
         - in: query
           name: cursor
           required: false
@@ -861,22 +884,26 @@ paths:
           schema:
             type: string
             format: date-time
+          description: Only return records after this date
         - in: query
           name: until
           required: false
           schema:
             type: string
             format: date-time
+          description: Only return records before this date
         - in: query
           name: limit
           required: false
           schema:
             type: number
+          description: Maximum number of results to return
         - in: query
           name: cursor
           required: false
           schema:
             type: string
+          description: Opaque pagination cursor from a previous response
       responses:
         '200':
           description: Fetch Closed Orders response
@@ -909,22 +936,26 @@ paths:
           schema:
             type: string
             format: date-time
+          description: Only return records after this date
         - in: query
           name: until
           required: false
           schema:
             type: string
             format: date-time
+          description: Only return records before this date
         - in: query
           name: limit
           required: false
           schema:
             type: number
+          description: Maximum number of results to return
         - in: query
           name: cursor
           required: false
           schema:
             type: string
+          description: Opaque pagination cursor from a previous response
       responses:
         '200':
           description: Fetch All Orders response
@@ -1535,36 +1566,48 @@ components:
           description: Link to parent event
         title:
           type: string
+          description: 'The market title (e.g., "Will BTC close above $100k on Dec 31?").'
         description:
           type: string
+          description: Long-form market description or resolution criteria.
         slug:
           type: string
+          description: URL-friendly slug for the market.
         outcomes:
           type: array
           items:
             $ref: '#/components/schemas/MarketOutcome'
+          description: The possible outcomes for this market.
         resolutionDate:
           type: string
           format: date-time
+          description: When the market is scheduled to resolve.
         volume24h:
           type: number
+          description: Trading volume over the past 24 hours (USD).
         volume:
           type: number
           description: Total / Lifetime volume
         liquidity:
           type: number
+          description: Current market liquidity (USD).
         openInterest:
           type: number
+          description: Total value of outstanding contracts (USD).
         url:
           type: string
+          description: Canonical URL to view the market on the venue.
         image:
           type: string
+          description: Optional image URL for the market.
         category:
           type: string
+          description: 'Optional category label (e.g., "Politics", "Crypto").'
         tags:
           type: array
           items:
             type: string
+          description: Optional list of tags associated with the market.
         tickSize:
           type: number
           description: 'Minimum price increment (e.g., 0.01, 0.001)'
@@ -1575,13 +1618,21 @@ components:
           type: string
           description: 'On-chain contract / condition identifier where applicable (Polymarket conditionId, etc.).'
         'yes':
-          $ref: '#/components/schemas/MarketOutcome'
+          allOf:
+            - $ref: '#/components/schemas/MarketOutcome'
+          description: Convenience accessor for the YES outcome on a binary market.
         'no':
-          $ref: '#/components/schemas/MarketOutcome'
+          allOf:
+            - $ref: '#/components/schemas/MarketOutcome'
+          description: Convenience accessor for the NO outcome on a binary market.
         up:
-          $ref: '#/components/schemas/MarketOutcome'
+          allOf:
+            - $ref: '#/components/schemas/MarketOutcome'
+          description: Convenience accessor for the UP outcome on a binary market.
         down:
-          $ref: '#/components/schemas/MarketOutcome'
+          allOf:
+            - $ref: '#/components/schemas/MarketOutcome'
+          description: Convenience accessor for the DOWN outcome on a binary market.
       required:
         - marketId
         - title
@@ -1602,10 +1653,13 @@ components:
           description: The market this outcome belongs to (set automatically when outcomes are built)
         label:
           type: string
+          description: 'Human-readable outcome label (e.g., "Yes", "No", candidate name).'
         price:
           type: number
+          description: Probability between 0.0 and 1.0.
         priceChange24h:
           type: number
+          description: 'Change in price over the past 24 hours, as an absolute probability delta.'
         metadata:
           type: object
           additionalProperties: {}
@@ -1620,31 +1674,41 @@ components:
       properties:
         id:
           type: string
+          description: The unique identifier for this event.
         title:
           type: string
+          description: 'The event title (e.g., "Who will be Fed Chair?").'
         description:
           type: string
+          description: Long-form event description.
         slug:
           type: string
+          description: URL-friendly slug for the event.
         markets:
           type: array
           items:
             $ref: '#/components/schemas/UnifiedMarket'
+          description: Markets grouped under this event.
         volume24h:
           type: number
+          description: Trading volume over the past 24 hours (USD).
         volume:
           type: number
           description: Total / Lifetime volume (sum across markets; undefined if no market provides it)
         url:
           type: string
+          description: Canonical URL to view the event on the venue.
         image:
           type: string
+          description: Optional image URL for the event.
         category:
           type: string
+          description: 'Optional category label (e.g., "Politics", "Sports").'
         tags:
           type: array
           items:
             type: string
+          description: Optional list of tags associated with the event.
       required:
         - id
         - title
@@ -1658,16 +1722,22 @@ components:
       properties:
         timestamp:
           type: number
+          description: Unix timestamp in milliseconds marking the start of the candle.
         open:
           type: number
+          description: Opening price for the interval (probability between 0.0 and 1.0).
         high:
           type: number
+          description: Highest price during the interval (probability between 0.0 and 1.0).
         low:
           type: number
+          description: Lowest price during the interval (probability between 0.0 and 1.0).
         close:
           type: number
+          description: Closing price for the interval (probability between 0.0 and 1.0).
         volume:
           type: number
+          description: Trading volume during the interval.
       required:
         - timestamp
         - open
@@ -1681,12 +1751,15 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderLevel'
+          description: 'Order book bid levels, sorted by price descending.'
         asks:
           type: array
           items:
             $ref: '#/components/schemas/OrderLevel'
+          description: 'Order book ask levels, sorted by price ascending.'
         timestamp:
           type: number
+          description: Unix timestamp in milliseconds when the snapshot was taken.
       required:
         - bids
         - asks
@@ -1707,20 +1780,26 @@ components:
       properties:
         id:
           type: string
+          description: The unique identifier for this trade.
         timestamp:
           type: number
+          description: Unix timestamp in milliseconds when the trade executed.
         price:
           type: number
+          description: Probability between 0.0 and 1.0.
         amount:
           type: number
+          description: Size of the trade in contracts/shares.
         side:
           type: string
           enum:
             - buy
             - sell
             - unknown
+          description: Trade side from the taker's perspective.
         outcomeId:
           type: string
+          description: The outcome this trade is for (if known).
       required:
         - id
         - timestamp
@@ -1732,22 +1811,29 @@ components:
       properties:
         id:
           type: string
+          description: The unique identifier for this trade.
         timestamp:
           type: number
+          description: Unix timestamp in milliseconds when the trade executed.
         price:
           type: number
+          description: Probability between 0.0 and 1.0.
         amount:
           type: number
+          description: Size of the trade in contracts/shares.
         side:
           type: string
           enum:
             - buy
             - sell
             - unknown
+          description: Trade side from the taker's perspective.
         outcomeId:
           type: string
+          description: The outcome this trade is for (if known).
         orderId:
           type: string
+          description: 'The order that produced this trade, if known.'
       required:
         - id
         - timestamp
@@ -1759,20 +1845,25 @@ components:
       properties:
         id:
           type: string
+          description: The exchange-assigned order identifier.
         marketId:
           type: string
+          description: The market this order was placed on.
         outcomeId:
           type: string
+          description: The outcome this order was placed on.
         side:
           type: string
           enum:
             - buy
             - sell
+          description: 'Order side: buy or sell.'
         type:
           type: string
           enum:
             - market
             - limit
+          description: 'Order type: market (execute immediately) or limit (resting at a price).'
         price:
           type: number
           description: For limit orders
@@ -1787,6 +1878,7 @@ components:
             - filled
             - cancelled
             - rejected
+          description: Lifecycle status of the order.
         filled:
           type: number
           description: Amount filled
@@ -1795,8 +1887,10 @@ components:
           description: Amount remaining
         timestamp:
           type: number
+          description: Unix timestamp in milliseconds when the order was created.
         fee:
           type: number
+          description: 'Fee paid for this order, if known.'
       required:
         - id
         - marketId
@@ -1813,21 +1907,28 @@ components:
       properties:
         marketId:
           type: string
+          description: The market this position is held in.
         outcomeId:
           type: string
+          description: The outcome this position is held in.
         outcomeLabel:
           type: string
+          description: Human-readable label for the outcome held.
         size:
           type: number
           description: 'Positive for long, negative for short'
         entryPrice:
           type: number
+          description: Average entry price for the position (probability between 0.0 and 1.0).
         currentPrice:
           type: number
+          description: Current mark price for the position (probability between 0.0 and 1.0).
         unrealizedPnL:
           type: number
+          description: Unrealized profit or loss at the current price (USD).
         realizedPnL:
           type: number
+          description: Realized profit or loss booked so far (USD).
       required:
         - marketId
         - outcomeId
@@ -1844,8 +1945,10 @@ components:
           description: 'e.g., ''USDC'''
         total:
           type: number
+          description: Total balance including funds locked in open orders.
         available:
           type: number
+          description: Balance available to trade (excludes locked funds).
         locked:
           type: number
           description: In open orders
@@ -1875,10 +1978,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UnifiedMarket'
+          description: The page of unified markets
         total:
           type: number
+          description: Total number of markets in the snapshot
         nextCursor:
           type: string
+          description: 'Cursor to pass to the next call, or undefined if this is the last page'
       required:
         - data
         - total
@@ -1887,14 +1993,17 @@ components:
       properties:
         limit:
           type: number
+          description: Maximum number of results to return
         offset:
           type: number
+          description: Pagination offset — number of results to skip
         sort:
           type: string
           enum:
             - volume
             - liquidity
             - newest
+          description: Sort order for results
         status:
           type: string
           enum:
@@ -1939,14 +2048,17 @@ components:
           description: For keyword search
         limit:
           type: number
+          description: Maximum number of results to return
         offset:
           type: number
+          description: Pagination offset — number of results to skip
         sort:
           type: string
           enum:
             - volume
             - liquidity
             - newest
+          description: Sort order for results
         status:
           type: string
           enum:
@@ -1961,6 +2073,7 @@ components:
             - title
             - description
             - both
+          description: 'Where to search (default: ''title'')'
         eventId:
           type: string
           description: Direct lookup by event ID
@@ -1984,11 +2097,14 @@ components:
         start:
           type: string
           format: date-time
+          description: Start of the time range
         end:
           type: string
           format: date-time
+          description: End of the time range
         limit:
           type: number
+          description: Maximum number of results to return
     OHLCVParams:
       type: object
       properties:
@@ -2005,11 +2121,14 @@ components:
         start:
           type: string
           format: date-time
+          description: Start of the time range
         end:
           type: string
           format: date-time
+          description: End of the time range
         limit:
           type: number
+          description: Maximum number of results to return
       required:
         - resolution
     TradesParams:
@@ -2019,30 +2138,38 @@ components:
         start:
           type: string
           format: date-time
+          description: Start of the time range
         end:
           type: string
           format: date-time
+          description: End of the time range
         limit:
           type: number
+          description: Maximum number of results to return
     CreateOrderParams:
       type: object
       properties:
         marketId:
           type: string
+          description: The market to trade on.
         outcomeId:
           type: string
+          description: The outcome to trade.
         side:
           type: string
           enum:
             - buy
             - sell
+          description: 'Order side: buy or sell.'
         type:
           type: string
           enum:
             - market
             - limit
+          description: 'Order type: market (execute immediately) or limit (resting at a price).'
         amount:
           type: number
+          description: Size of the order in contracts/shares.
         price:
           type: number
           description: Required for limit orders
@@ -2112,11 +2239,14 @@ components:
         since:
           type: string
           format: date-time
+          description: Only return records after this date
         until:
           type: string
           format: date-time
+          description: Only return records before this date
         limit:
           type: number
+          description: Maximum number of results to return
         cursor:
           type: string
           description: for Kalshi cursor pagination
@@ -2129,13 +2259,17 @@ components:
         since:
           type: string
           format: date-time
+          description: Only return records after this date
         until:
           type: string
           format: date-time
+          description: Only return records before this date
         limit:
           type: number
+          description: Maximum number of results to return
         cursor:
           type: string
+          description: Opaque pagination cursor from a previous response
     ExchangeCredentials:
       type: object
       description: Optional authentication credentials for exchange operations.
@@ -2144,8 +2278,10 @@ components:
           type: string
         apiSecret:
           type: string
+          description: Standard API secret for HMAC-authenticated exchanges
         passphrase:
           type: string
+          description: Standard API passphrase for HMAC-authenticated exchanges
         apiToken:
           type: string
           description: 'Metaculus: `Authorization: Token <apiToken>` for higher rate limits'

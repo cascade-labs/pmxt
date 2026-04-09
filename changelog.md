@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.27.5] - 2026-04-09
+
+### Changed
+
+- **Documented all 129 previously undocumented interface fields in `core/src/types.ts` and `core/src/BaseExchange.ts`**: After 2.27.3 made the OpenAPI generator AST-derived, fields without JSDoc or trailing `//` comments rendered in the spec (and downstream Mintlify docs) with no description — `offset`, `limit`, every `ExchangeHas` capability flag, all `UnifiedMarket` / `UnifiedEvent` / `Order` / `Position` / `Trade` fields, etc. This release adds concise JSDoc to every undocumented property signature in the two source files, bringing coverage from 68/197 (34.5%) to 197/197 (100%). Regenerated `openapi.yaml` now carries 282 `description:` fields (up from ~155). Pure documentation change — no type signatures, runtime behaviour, or SDK surface modified. The AST walker picks these up automatically, so Mintlify's API playground will now surface field descriptions for every parameter and response model.
+
 ## [2.27.4] - 2026-04-09
 
 ### Fixed
