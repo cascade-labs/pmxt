@@ -436,28 +436,34 @@ function buildPathSpec(method, sourceFile) {
   if (verb === 'get') {
     const parameters = [{ $ref: '#/components/parameters/ExchangeParam' }];
 
-    if (paramsMeta.length === 1 && paramsMeta[0].kind === 'object') {
-      // Expand the single object param's properties as flat query params
-      parameters.push(
-        ...expandObjectParamToQuery(paramsMeta[0], params[0], sourceFile)
-      );
-    } else {
-      for (let i = 0; i < paramsMeta.length; i++) {
-        const pm = paramsMeta[i];
-        parameters.push({
-          in: 'query',
-          name: pm.name,
-          required: !pm.optional,
-          schema: {
-            type:
-              pm.kind === 'number'
-                ? 'number'
-                : pm.kind === 'boolean'
-                ? 'boolean'
-                : 'string',
-          },
-        });
+    // Emit each param in order: primitives become flat query params
+    // named after the TS arg; object params get their properties
+    // expanded into flat query params via the SCHEMAS lookup. This
+    // handles both shapes we care about: a single object arg
+    // (fetchMarkets(params)) and mixed `[primitive..., object]` shapes
+    // (fetchOHLCV(id, params)). Without the expansion the object arg
+    // would render as a meaningless `params: string` field in the docs.
+    for (let i = 0; i < paramsMeta.length; i++) {
+      const pm = paramsMeta[i];
+      if (pm.kind === 'object') {
+        parameters.push(
+          ...expandObjectParamToQuery(pm, params[i], sourceFile)
+        );
+        continue;
       }
+      parameters.push({
+        in: 'query',
+        name: pm.name,
+        required: !pm.optional,
+        schema: {
+          type:
+            pm.kind === 'number'
+              ? 'number'
+              : pm.kind === 'boolean'
+              ? 'boolean'
+              : 'string',
+        },
+      });
     }
 
     const pathObj = {

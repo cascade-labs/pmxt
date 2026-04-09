@@ -481,10 +481,36 @@ paths:
           schema:
             type: string
         - in: query
-          name: params
-          required: true
+          name: resolution
+          required: false
           schema:
             type: string
+            enum:
+              - 1m
+              - 5m
+              - 15m
+              - 1h
+              - 6h
+              - 1d
+            description: Candle interval for aggregation
+          description: Candle interval for aggregation
+        - in: query
+          name: start
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
       responses:
         '200':
           description: Fetch O H L C V response
@@ -538,10 +564,22 @@ paths:
           schema:
             type: string
         - in: query
-          name: params
-          required: true
+          name: start
+          required: false
           schema:
             type: string
+            format: date-time
+        - in: query
+          name: end
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
       responses:
         '200':
           description: Fetch Trades response

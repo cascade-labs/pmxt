@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.27.2] - 2026-04-09
+
+### Fixed
+
+- **Object params rendered as `params: string` in the generated OpenAPI spec**: `fetchOHLCV(id, params)` and `fetchTrades(id, params)` have a `[primitive, object]` signature. The GET branch of `scripts/generate-openapi.js` only expanded object props when there was a *single* object arg, so for these mixed signatures the trailing object was emitted as a bare `params` query string — which surfaced in Mintlify's API playground as two required fields (`id` and `params`) with no way to discover `resolution`, `start`, `end`, `limit`. The generator now expands any object-kind param regardless of arity, so the spec and the docs show the real field list.
+
 ## [2.27.1] - 2026-04-09
 
 ### Fixed
