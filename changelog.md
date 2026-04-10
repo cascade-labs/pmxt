@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.27.8] - 2026-04-10
+
+### Fixed
+
+- **Phantom/Solana private keys produce cryptic ethers error instead of actionable message** (issue #78): Passing a Solana-format private key (base58 ed25519, e.g. from Phantom wallet) to the Polymarket exchange threw `INVALID_ARGUMENT: invalid hexlify value` from deep inside ethers.js, with no indication of what was wrong or how to fix it. Added early key format validation in `PolymarketAuth` constructor (`core/src/exchanges/polymarket/auth.ts`) that checks the key is a 64-character hex string (with optional `0x` prefix) before passing it to `new Wallet()`. Non-hex keys now throw a clear error explaining that Polymarket requires a 32-byte hex EVM key and that Solana wallet keys are not compatible.
+
 ## [2.27.7] - 2026-04-10
 
 ### Changed

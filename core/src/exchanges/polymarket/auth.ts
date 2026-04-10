@@ -34,6 +34,19 @@ export class PolymarketAuth {
             privateKey = privateKey.replace(/\\n/g, '\n');
         }
 
+        // Validate key format before passing to ethers. Solana wallets
+        // (e.g. Phantom) export base58 ed25519 keys which are not
+        // compatible with EVM. Detect early and give a clear message.
+        const stripped = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
+        if (!/^[0-9a-fA-F]{64}$/.test(stripped)) {
+            throw new Error(
+                'Invalid private key format. Polymarket requires a 32-byte hex EVM private key ' +
+                '(e.g. 0xabc123...). If you exported this key from Phantom or another Solana wallet, ' +
+                'note that Solana keys are not compatible with EVM. Import your recovery phrase ' +
+                'into an EVM wallet (e.g. MetaMask) to obtain the correct key.'
+            );
+        }
+
         this.signer = new Wallet(privateKey);
     }
 
