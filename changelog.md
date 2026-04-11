@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.30.2] - 2026-04-11
+
+### Fixed
+
+- **MCP agents call fetchMarkets instead of fetchEvents**: Agents didn't understand the Event -> Market -> Outcome hierarchy and defaulted to fetchMarkets for discovery. Updated OpenAPI descriptions for fetchEvents ("start here for discovery and search"), fetchMarkets ("prefer fetchEvents instead"), and UnifiedEvent schema to teach the data model with concrete examples. Also updated MCP server instructions in pmxt-mcp with a new DATA MODEL section and revised WORKFLOW that leads with fetchEvents.
+
 ## [2.30.1] - 2026-04-11
 
 ### Fixed
