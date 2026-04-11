@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.28.5] - 2026-04-11
+
+### Fixed
+
+- **Publish workflow docs auto-commit failed**: The v2.28.3 amend-and-force-push strategy failed for two reasons: tag checkout produced a detached HEAD (so `--amend` created a rootless 458-file commit), and `--force-with-lease` was rejected because the auto-tag workflow had already pushed to main. Replaced with a simpler approach: checkout `main` with full history, `git pull --rebase` to catch any concurrent pushes, then create a normal commit. No force-push needed.
+
 ## [2.28.4] - 2026-04-11
 
 ### Fixed
