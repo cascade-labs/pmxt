@@ -151,13 +151,6 @@
               "POST /api/{exchange}/watchAddress",
               "POST /api/{exchange}/unwatchAddress"
             ]
-          },
-          {
-            "group": "Other",
-            "openapi": "api-reference/openapi.json",
-            "pages": [
-              "POST /api/{exchange}/testDummyMethod"
-            ]
           }
         ]
       }
