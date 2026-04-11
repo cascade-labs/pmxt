@@ -1,0 +1,279 @@
+#!/usr/bin/env node
+'use strict';
+
+/**
+ * generate-mintlify-docs.js
+ *
+ * Generates Mintlify-specific documentation artefacts from the hosted
+ * openapi.json that `generate:openapi` already produces:
+ *
+ *   1. docs/concepts/venues.mdx  — venue matrix from the ExchangeParam enum
+ *   2. docs/docs.json            — navigation sidebar with endpoint groups
+ *
+ * Run: node scripts/generate-mintlify-docs.js
+ *
+ * This script is idempotent and safe to run repeatedly. It reads from the
+ * already-generated docs/api-reference/openapi.json (produced by
+ * core/scripts/generate-openapi.js) so the two scripts can be chained:
+ *   generate:openapi -> generate:mintlify
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..');
+const OPENAPI_JSON_PATH = path.join(ROOT, 'docs', 'api-reference', 'openapi.json');
+const VENUES_DEST = path.join(ROOT, 'docs', 'concepts', 'venues.mdx');
+const DOCS_JSON = path.join(ROOT, 'docs', 'docs.json');
+const LEGACY_MINT_JSON = path.join(ROOT, 'docs', 'mint.json');
+
+// ---------------------------------------------------------------------------
+// Venue labels
+// ---------------------------------------------------------------------------
+
+const VENUE_LABELS = {
+    polymarket: 'Polymarket',
+    polymarket_us: 'Polymarket US',
+    kalshi: 'Kalshi',
+    'kalshi-demo': 'Kalshi (Demo)',
+    limitless: 'Limitless',
+    probable: 'Probable',
+    baozi: 'Baozi',
+    myriad: 'Myriad',
+    opinion: 'Opinion',
+    metaculus: 'Metaculus',
+    smarkets: 'Smarkets',
+};
+
+function extractVenues(spec) {
+    const enumValues =
+        spec?.components?.parameters?.ExchangeParam?.schema?.enum;
+    if (!Array.isArray(enumValues)) return [];
+    return enumValues.map((wire) => ({
+        wire,
+        label: VENUE_LABELS[wire] || wire,
+    }));
+}
+
+function writeVenuesPage(venues, coreVersion) {
+    const rows = venues
+        .map(
+            ({ wire, label }) =>
+                `| ${label} | \`${wire}\` | \`POST /api/${wire}/:method\` |`
+        )
+        .join('\n');
+
+    const body = `---
+title: Supported Venues
+description: "Every venue PMXT currently speaks."
+---
+
+{/*
+  AUTO-GENERATED from pmxt-core's openapi spec (ExchangeParam enum).
+  Do not edit by hand — run \`npm run generate:mintlify\` to regenerate.
+  Source: docs/api-reference/openapi.json
+  pmxt-core version at last sync: ${coreVersion}
+*/}
+
+PMXT Hosted currently supports the following venues. The **wire key** is
+the value you pass in the URL — e.g. \`POST /api/polymarket/fetchMarkets\`
+or \`new pmxt.Polymarket({})\` from the SDKs.
+
+| Venue | Wire Key | Pass-Through Base |
+| ----- | -------- | ----------------- |
+${rows}
+
+<Note>
+  This list is regenerated automatically from the \`ExchangeParam\` enum
+  in pmxt-core's OpenAPI spec on every \`pmxt-core\` upgrade. If a venue
+  is missing here, it's not yet wired through pmxt-core.
+</Note>
+
+## Feature support
+
+Not every venue supports every method. Broadly:
+
+- **Catalog reads** (\`fetchMarkets\`, \`fetchEvents\`, \`fetchMarket\`,
+  \`fetchEvent\`) — supported on every venue that the catalog ingests.
+- **Live reads** (\`fetchOrderBook\`, \`fetchOHLCV\`, \`fetchTrades\`) —
+  supported where the venue exposes the data.
+- **Writes** (\`createOrder\`, \`cancelOrder\`, \`fetchBalance\`,
+  \`fetchPositions\`) — supported where the venue has a trading API.
+
+See the [API Reference](/api-reference/overview) for the per-method
+matrix (inferred from the OpenAPI \`operationId\`s).
+`;
+
+    fs.mkdirSync(path.dirname(VENUES_DEST), { recursive: true });
+    fs.writeFileSync(VENUES_DEST, body);
+    console.log(
+        `[generate-mintlify] wrote ${path.relative(ROOT, VENUES_DEST)} ` +
+            `(${venues.length} venues)`
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Endpoint grouping for the Mintlify sidebar
+// ---------------------------------------------------------------------------
+
+const ENDPOINT_GROUPS = [
+    {
+        name: 'System',
+        match: (opId) => ['healthCheck', 'loadMarkets', 'close'].includes(opId),
+    },
+    {
+        name: 'Markets & Events',
+        match: (opId) =>
+            /^(fetchMarkets|fetchMarketsPaginated|fetchEvents|fetchMarket|fetchEvent|filterMarkets|filterEvents)$/.test(
+                opId
+            ),
+    },
+    {
+        name: 'Order Book & Trades',
+        match: (opId) =>
+            /^(fetchOrderBook|fetchOHLCV|fetchTrades|getExecutionPrice|getExecutionPriceDetailed)$/.test(
+                opId
+            ),
+    },
+    {
+        name: 'Trading',
+        match: (opId) =>
+            /^(createOrder|buildOrder|submitOrder|cancelOrder|editOrder)$/.test(
+                opId
+            ),
+    },
+    {
+        name: 'Orders & Positions',
+        match: (opId) =>
+            /^(fetchOrder|fetchOpenOrders|fetchClosedOrders|fetchAllOrders|fetchMyTrades|fetchPositions|fetchBalance|fetchOrderHistory)$/.test(
+                opId
+            ),
+    },
+    {
+        name: 'Realtime',
+        match: (opId) => /^(watch|unwatch)/.test(opId),
+    },
+];
+
+function buildEndpointGroups(spec) {
+    const buckets = new Map();
+    for (const group of ENDPOINT_GROUPS) buckets.set(group.name, []);
+    buckets.set('Other', []);
+
+    for (const [pathKey, methods] of Object.entries(spec.paths || {})) {
+        for (const [method, op] of Object.entries(methods)) {
+            if (!['get', 'post', 'put', 'delete', 'patch'].includes(method)) {
+                continue;
+            }
+            const opId = op.operationId || '';
+            const ref = `${method.toUpperCase()} ${pathKey}`;
+
+            let placed = false;
+            for (const group of ENDPOINT_GROUPS) {
+                if (group.match(opId)) {
+                    buckets.get(group.name).push(ref);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) buckets.get('Other').push(ref);
+        }
+    }
+
+    const groups = [];
+    for (const [name, refs] of buckets.entries()) {
+        if (refs.length === 0) continue;
+        groups.push({
+            group: name,
+            openapi: 'api-reference/openapi.json',
+            pages: refs,
+        });
+    }
+    return groups;
+}
+
+function updateDocsJsonEndpoints(spec) {
+    // Remove any leftover legacy mint.json.
+    if (fs.existsSync(LEGACY_MINT_JSON)) {
+        fs.unlinkSync(LEGACY_MINT_JSON);
+        console.log(
+            `[generate-mintlify] removed legacy ${path.relative(ROOT, LEGACY_MINT_JSON)}`
+        );
+    }
+
+    if (!fs.existsSync(DOCS_JSON)) {
+        console.warn(
+            `[generate-mintlify] ${path.relative(ROOT, DOCS_JSON)} not found — skipping`
+        );
+        return;
+    }
+
+    const raw = fs.readFileSync(DOCS_JSON, 'utf8');
+    const docs = JSON.parse(raw);
+    const endpointGroups = buildEndpointGroups(spec);
+
+    const nav = docs.navigation || {};
+    const tabs = Array.isArray(nav.tabs) ? [...nav.tabs] : [];
+    const apiTabIdx = tabs.findIndex((t) => t && t.tab === 'API Reference');
+    const apiTab = {
+        tab: 'API Reference',
+        groups: [
+            {
+                group: 'Overview',
+                pages: ['api-reference/overview'],
+            },
+            ...endpointGroups,
+        ],
+    };
+    if (apiTabIdx >= 0) {
+        const updatedTabs = [...tabs];
+        updatedTabs[apiTabIdx] = apiTab;
+        const updatedDocs = { ...docs, navigation: { ...nav, tabs: updatedTabs } };
+        fs.writeFileSync(DOCS_JSON, JSON.stringify(updatedDocs, null, 2) + '\n');
+    } else {
+        const updatedDocs = { ...docs, navigation: { ...nav, tabs: [...tabs, apiTab] } };
+        fs.writeFileSync(DOCS_JSON, JSON.stringify(updatedDocs, null, 2) + '\n');
+    }
+
+    const total = endpointGroups.reduce((n, g) => n + g.pages.length, 0);
+    console.log(
+        `[generate-mintlify] wrote ${path.relative(ROOT, DOCS_JSON)} ` +
+            `(${endpointGroups.length} endpoint groups, ${total} endpoints)`
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+function main() {
+    if (!fs.existsSync(OPENAPI_JSON_PATH)) {
+        console.error(
+            `[generate-mintlify] ${path.relative(ROOT, OPENAPI_JSON_PATH)} not found. ` +
+                `Run 'npm run generate:openapi --workspace=pmxt-core' first.`
+        );
+        process.exit(1);
+    }
+
+    const raw = fs.readFileSync(OPENAPI_JSON_PATH, 'utf8');
+    const spec = JSON.parse(raw);
+
+    // Derive the core version from the spec's info.version (set by
+    // generate-openapi.js's rewriteForHosted).
+    const coreVersion = spec.info?.version || 'unknown';
+
+    // Generate venues page
+    const venues = extractVenues(spec);
+    if (venues.length > 0) {
+        writeVenuesPage(venues, coreVersion);
+    } else {
+        console.warn(
+            '[generate-mintlify] ExchangeParam enum missing — venues page not updated'
+        );
+    }
+
+    // Update docs.json navigation sidebar
+    updateDocsJsonEndpoints(spec);
+}
+
+main();

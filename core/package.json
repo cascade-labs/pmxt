@@ -37,7 +37,8 @@
     "generate:openapi": "node scripts/generate-openapi.js",
     "generate:python-exchanges": "node scripts/generate-python-exchanges.js",
     "generate:compliance": "node scripts/generate-compliance.js",
-    "generate:sdk:all": "npm run generate:openapi && npm run generate:sdk:python && npm run generate:python-exchanges && npm run generate:sdk:typescript && npm run generate:docs && npm run generate:compliance"
+    "generate:mintlify": "node ../scripts/generate-mintlify-docs.js",
+    "generate:sdk:all": "npm run generate:openapi && npm run generate:sdk:python && npm run generate:python-exchanges && npm run generate:sdk:typescript && npm run generate:docs && npm run generate:mintlify && npm run generate:compliance"
   },
   "keywords": [],
   "author": "",

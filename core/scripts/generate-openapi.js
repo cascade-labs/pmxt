@@ -22,6 +22,439 @@ const METHOD_VERBS_OUT_PATH = path.join(
     __dirname,
     '../src/server/method-verbs.json'
 );
+// Hosted docs output — Mintlify reads this JSON file for the API
+// reference pages. Written alongside the sidecar YAML so a single
+// `generate:openapi` invocation keeps both artefacts in sync.
+const DOCS_OPENAPI_OUT_PATH = path.join(
+    __dirname,
+    '../../docs/api-reference/openapi.json'
+);
+
+// ---------------------------------------------------------------------------
+// Hosted-context rewrites
+//
+// The sidecar spec is unauthenticated and points at localhost. For the
+// hosted Mintlify docs we overlay the production URL, bearer auth, and
+// a user-facing title/description. These transforms mirror what the
+// now-deleted scripts/sync-docs.js used to do at postinstall time.
+// ---------------------------------------------------------------------------
+
+const HOSTED_URL = process.env.HOSTED_PMXT_URL || 'https://api.pmxt.dev';
+const HOSTED_TITLE = 'PMXT Hosted API';
+const HOSTED_DESCRIPTION =
+    'One API for every prediction market. Cross-venue search in under 10ms, a single unified schema, and the complete venue surface from reads to trades.';
+
+function readCoreVersion() {
+    try {
+        const pkg = JSON.parse(
+            fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8')
+        );
+        return pkg.version;
+    } catch {
+        return 'unknown';
+    }
+}
+
+/**
+ * Return a new spec object with hosted-specific overrides applied.
+ * The input is never mutated.
+ */
+function rewriteForHosted(spec, coreVersion) {
+    const next = { ...spec };
+
+    next.openapi = String(spec.openapi || '3.0.0');
+
+    next.info = {
+        ...(spec.info || {}),
+        title: HOSTED_TITLE,
+        description: HOSTED_DESCRIPTION,
+        version: String(coreVersion),
+    };
+
+    next.servers = [
+        {
+            url: HOSTED_URL,
+            description: 'Hosted PMXT (production)',
+        },
+    ];
+
+    const components = { ...(spec.components || {}) };
+    components.securitySchemes = {
+        ...(components.securitySchemes || {}),
+        bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            description:
+                'Required when calling the hosted API directly (curl, requests, fetch). SDK users pass credentials via constructor params instead.',
+        },
+    };
+    next.components = components;
+
+    next.security = [{ bearerAuth: [] }];
+
+    return next;
+}
+
+// ---------------------------------------------------------------------------
+// SDK code sample generation (x-codeSamples)
+//
+// Mintlify supports `x-codeSamples` on each OpenAPI operation to display
+// custom language tabs. We generate Python SDK (pmxt) and TypeScript SDK
+// (pmxtjs) samples so users see real SDK calls instead of raw HTTP.
+// ---------------------------------------------------------------------------
+
+/** Convert a camelCase string to snake_case, keeping acronyms intact. */
+function toSnakeCaseSdk(str) {
+    return str
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+        .toLowerCase();
+}
+
+/** Resolve a JSON Pointer $ref against the spec. */
+function resolveRef(ref, spec) {
+    if (typeof ref !== 'string' || !ref.startsWith('#/')) return undefined;
+    const parts = ref.replace(/^#\//, '').split('/');
+    let current = spec;
+    for (const part of parts) {
+        if (current == null) return undefined;
+        current = current[part];
+    }
+    return current;
+}
+
+/** Return a sensible example value for a parameter based on its name and schema. */
+function exampleValue(name, schema) {
+    const lowerName = (name || '').toLowerCase();
+
+    if (lowerName === 'query') return 'election';
+    if (lowerName === 'id' || lowerName === 'marketid' || lowerName === 'eventid') return '12345';
+    if (lowerName === 'outcomeid') return '67890';
+    if (lowerName === 'orderid') return 'ord-001';
+    if (lowerName === 'limit') return 10;
+    if (lowerName === 'offset') return 0;
+    if (lowerName === 'cursor') return 'abc123';
+    if (lowerName === 'side') return 'buy';
+    if (lowerName === 'type') return 'limit';
+    if (lowerName === 'amount') return 10;
+    if (lowerName === 'price') return 0.55;
+    if (lowerName === 'symbol' || lowerName === 'slug') return 'BTC-USD';
+    if (lowerName === 'address') return '0xabc...';
+    if (lowerName === 'resolution') return '1h';
+    if (lowerName.includes('id')) return '12345';
+
+    if (schema) {
+        if (schema.example !== undefined) return schema.example;
+        if (Array.isArray(schema.enum) && schema.enum.length > 0) return schema.enum[0];
+        if (schema.type === 'string') return 'value';
+        if (schema.type === 'number' || schema.type === 'integer') return 1;
+        if (schema.type === 'boolean') return true;
+        if (schema.type === 'array') return [];
+        if (schema.type === 'object') return {};
+    }
+
+    return 'value';
+}
+
+/** Format a value for Python source code. */
+function formatPyValue(v) {
+    if (typeof v === 'string') return `"${v}"`;
+    if (typeof v === 'boolean') return v ? 'True' : 'False';
+    if (Array.isArray(v)) return '[]';
+    if (v !== null && typeof v === 'object') return '{}';
+    return String(v);
+}
+
+/** Format a value for JavaScript/TypeScript source code. */
+function formatJsValue(v) {
+    if (typeof v === 'string') return `"${v}"`;
+    if (typeof v === 'boolean') return v ? 'true' : 'false';
+    if (Array.isArray(v)) return '[]';
+    if (v !== null && typeof v === 'object') return '{}';
+    return String(v);
+}
+
+/**
+ * For GET endpoints, collect query parameters (skipping ExchangeParam $refs).
+ * Returns an array of { name, value } — required first, then optional.
+ */
+function extractGetParamsSdk(operation, spec) {
+    const params = operation.parameters || [];
+    const required = [];
+    const optional = [];
+
+    for (const raw of params) {
+        const param = raw.$ref ? resolveRef(raw.$ref, spec) : raw;
+        if (!param) continue;
+        if (param.name === 'exchange' || (param.schema && param.schema.title === 'ExchangeParam')) {
+            continue;
+        }
+        if (param.in !== 'query') continue;
+
+        const entry = { name: param.name, value: exampleValue(param.name, param.schema || {}) };
+        if (param.required) {
+            required.push(entry);
+        } else {
+            optional.push(entry);
+        }
+    }
+
+    return [...required, ...optional];
+}
+
+/**
+ * For POST endpoints, resolve the requestBody schema's `args.items` and
+ * extract required properties plus optional, capped at reasonable total.
+ */
+function extractPostParamsSdk(operation, spec) {
+    const content = operation.requestBody?.content?.['application/json'];
+    if (!content) return [];
+
+    let bodySchema = content.schema;
+    if (bodySchema?.$ref) bodySchema = resolveRef(bodySchema.$ref, spec);
+    if (!bodySchema) return [];
+
+    let targetSchema = bodySchema;
+    const argsSchema = bodySchema.properties?.args;
+    if (argsSchema) {
+        let itemsSchema = argsSchema.items;
+        if (itemsSchema?.$ref) itemsSchema = resolveRef(itemsSchema.$ref, spec);
+        if (itemsSchema) targetSchema = itemsSchema;
+    }
+
+    const properties = targetSchema.properties || {};
+    const requiredNames = new Set(targetSchema.required || []);
+    const required = [];
+    const optional = [];
+
+    for (const [name, propSchema] of Object.entries(properties)) {
+        const resolved = propSchema?.$ref ? resolveRef(propSchema.$ref, spec) : propSchema;
+        const entry = { name, value: exampleValue(name, resolved || {}) };
+        if (requiredNames.has(name)) {
+            required.push(entry);
+        } else {
+            optional.push(entry);
+        }
+    }
+
+    return [...required, ...optional];
+}
+
+const PARAM_OVERRIDES = {
+    fetchMarket: [{ name: 'marketId', value: '12345' }],
+    fetchEvent: [{ name: 'eventId', value: '12345' }],
+    cancelOrder: [{ name: 'orderId', value: 'ord-001' }],
+    watchOrderBook: [{ name: 'id', value: '12345' }],
+    watchTrades: [{ name: 'id', value: '12345' }],
+    watchAddress: [{ name: 'address', value: '0xabc...' }],
+    unwatchAddress: [{ name: 'address', value: '0xabc...' }],
+    getExecutionPrice: [
+        { name: 'orderBook', value: 'orderBook' },
+        { name: 'side', value: 'buy' },
+        { name: 'amount', value: 10 },
+    ],
+    getExecutionPriceDetailed: [
+        { name: 'orderBook', value: 'orderBook' },
+        { name: 'side', value: 'buy' },
+        { name: 'amount', value: 10 },
+    ],
+    editOrder: [
+        { name: 'orderId', value: 'ord-001' },
+        { name: 'price', value: 0.55 },
+        { name: 'amount', value: 10 },
+    ],
+};
+
+const FULL_OVERRIDES = {
+    submitOrder: {
+        pythonBody: [
+            'built = exchange.build_order(market_id="12345", side="buy", type="limit", amount=10, price=0.55)',
+            'result = exchange.submit_order(built)',
+        ],
+        typescriptBody: [
+            'const built = await exchange.buildOrder({ marketId: "12345", side: "buy", type: "limit", amount: 10, price: 0.55 });',
+            'const result = await exchange.submitOrder(built);',
+        ],
+    },
+};
+
+const FALLBACK_CONSTRUCTORS = {
+    kalshi: {
+        className: 'Kalshi',
+        params: [],
+    },
+};
+
+function constructorParamValue(param) {
+    if (param.default !== undefined) return param.default;
+    return `YOUR_${param.name.toUpperCase()}`;
+}
+
+function buildPyPreamble(exchangeInfo) {
+    const lines = ['import pmxt', ''];
+    if (exchangeInfo.params.length === 0) {
+        lines.push(`exchange = pmxt.${exchangeInfo.className}()`);
+    } else {
+        lines.push(`exchange = pmxt.${exchangeInfo.className}(`);
+        for (const param of exchangeInfo.params) {
+            lines.push(`    ${param.name}=${formatPyValue(constructorParamValue(param))},`);
+        }
+        lines.push(')');
+    }
+    return lines;
+}
+
+function buildTsPreamble(exchangeInfo) {
+    const lines = [
+        `import { ${exchangeInfo.className} } from "pmxtjs";`,
+        '',
+    ];
+    if (exchangeInfo.params.length === 0) {
+        lines.push(`const exchange = new ${exchangeInfo.className}();`);
+    } else {
+        lines.push(`const exchange = new ${exchangeInfo.className}({`);
+        for (const param of exchangeInfo.params) {
+            lines.push(`  ${param.tsName || param.name}: ${formatJsValue(constructorParamValue(param))},`);
+        }
+        lines.push('});');
+    }
+    return lines;
+}
+
+function buildPyMethodCall(pyMethod, params) {
+    if (params.length === 0) {
+        return [`result = exchange.${pyMethod}()`];
+    }
+    if (params.length <= 2) {
+        const inline = params.map((p) => `${toSnakeCaseSdk(p.name)}=${formatPyValue(p.value)}`).join(', ');
+        return [`result = exchange.${pyMethod}(${inline})`];
+    }
+    const lines = [`result = exchange.${pyMethod}(`];
+    for (const p of params) {
+        lines.push(`    ${toSnakeCaseSdk(p.name)}=${formatPyValue(p.value)},`);
+    }
+    lines.push(')');
+    return lines;
+}
+
+function buildTsMethodCall(jsMethod, params) {
+    if (params.length === 0) {
+        return [`const result = await exchange.${jsMethod}();`];
+    }
+    if (params.length <= 2) {
+        const inline = params.map((p) => `${p.name}: ${formatJsValue(p.value)}`).join(', ');
+        return [`const result = await exchange.${jsMethod}({ ${inline} });`];
+    }
+    const lines = [`const result = await exchange.${jsMethod}({`];
+    for (const p of params) {
+        lines.push(`  ${p.name}: ${formatJsValue(p.value)},`);
+    }
+    lines.push('});');
+    return lines;
+}
+
+/**
+ * Generate an x-codeSamples array for a single operation.
+ * Returns undefined for healthCheck (no SDK equivalent).
+ */
+function generateCodeSamples(operationId, httpMethod, pathKey, operation, spec) {
+    if (!operationId || operationId === 'healthCheck') return undefined;
+
+    const constructors = spec['x-sdk-constructors'] || FALLBACK_CONSTRUCTORS;
+    const exchangeEntries = Object.entries(constructors);
+
+    const params = PARAM_OVERRIDES[operationId]
+        || (httpMethod === 'get'
+            ? extractGetParamsSdk(operation, spec)
+            : extractPostParamsSdk(operation, spec));
+
+    let pythonSdkSamples;
+    let tsSdkSamples;
+
+    if (FULL_OVERRIDES[operationId]) {
+        const ov = FULL_OVERRIDES[operationId];
+        pythonSdkSamples = exchangeEntries.map(([, info]) => ({
+            lang: 'python',
+            label: info.className,
+            source: [...buildPyPreamble(info), ...ov.pythonBody].join('\n'),
+        }));
+        tsSdkSamples = exchangeEntries.map(([, info]) => ({
+            lang: 'javascript',
+            label: info.className,
+            source: [...buildTsPreamble(info), ...ov.typescriptBody].join('\n'),
+        }));
+    } else {
+        const pyMethod = toSnakeCaseSdk(operationId);
+        const jsMethod = operationId;
+        const pyBodyLines = buildPyMethodCall(pyMethod, params);
+        const tsBodyLines = buildTsMethodCall(jsMethod, params);
+
+        pythonSdkSamples = exchangeEntries.map(([, info]) => ({
+            lang: 'python',
+            label: info.className,
+            source: [...buildPyPreamble(info), ...pyBodyLines].join('\n'),
+        }));
+        tsSdkSamples = exchangeEntries.map(([, info]) => ({
+            lang: 'javascript',
+            label: info.className,
+            source: [...buildTsPreamble(info), ...tsBodyLines].join('\n'),
+        }));
+    }
+
+    return [...pythonSdkSamples, ...tsSdkSamples];
+}
+
+/**
+ * Walk every operation in the spec and attach x-codeSamples.
+ * Returns a NEW spec object — the input is never mutated.
+ */
+function injectCodeSamples(spec) {
+    const paths = spec.paths || {};
+    const newPaths = {};
+
+    for (const [pathKey, methods] of Object.entries(paths)) {
+        const newMethods = {};
+        for (const [method, op] of Object.entries(methods)) {
+            if (!['get', 'post', 'put', 'delete', 'patch'].includes(method)) {
+                newMethods[method] = op;
+                continue;
+            }
+            const samples = generateCodeSamples(op.operationId, method, pathKey, op, spec);
+            if (samples) {
+                newMethods[method] = { ...op, 'x-codeSamples': samples };
+            } else {
+                newMethods[method] = { ...op };
+            }
+        }
+        newPaths[pathKey] = newMethods;
+    }
+
+    return { ...spec, paths: newPaths };
+}
+
+/**
+ * Generate the hosted docs openapi.json from the sidecar spec.
+ * Applies hosted rewrites, injects SDK code samples, writes JSON.
+ */
+function generateHostedDocsSpec(spec) {
+    const coreVersion = readCoreVersion();
+    const rewritten = rewriteForHosted(spec, coreVersion);
+    const withSamples = injectCodeSamples(rewritten);
+
+    fs.mkdirSync(path.dirname(DOCS_OPENAPI_OUT_PATH), { recursive: true });
+    const out = JSON.stringify(withSamples, null, 2) + '\n';
+    fs.writeFileSync(DOCS_OPENAPI_OUT_PATH, out, 'utf-8');
+
+    // Remove any stale YAML copy so Mintlify doesn't see two specs.
+    const staleYaml = path.join(path.dirname(DOCS_OPENAPI_OUT_PATH), 'openapi.yaml');
+    if (fs.existsSync(staleYaml)) fs.unlinkSync(staleYaml);
+
+    const bytes = Buffer.byteLength(out, 'utf8');
+    console.log(
+        `Generated ${path.relative(process.cwd(), DOCS_OPENAPI_OUT_PATH)} ` +
+            `(${bytes} bytes, pmxt-core@${coreVersion})`
+    );
+}
 
 const EXCLUDED_METHODS = new Set(['callApi', 'defineImplicitApi']);
 
@@ -1168,6 +1601,11 @@ function main() {
   for (const { name, verb } of methodSpecs) {
     console.log(`  - ${verb.toUpperCase().padEnd(4)} ${name}`);
   }
+
+  // Generate the hosted docs openapi.json alongside the sidecar YAML
+  // so that `generate:openapi` is the single command that keeps both
+  // artefacts in sync.
+  generateHostedDocsSpec(spec);
 }
 
 main();

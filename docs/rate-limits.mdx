@@ -8,9 +8,12 @@ schema, and the complete venue pass-through.
 
 ## Limits
 
-| Per-minute | Per-month |
-| ---------- | --------- |
-| 60         | 25,000    |
+{/* HOSTED-AUTOGEN:rate-limits-table:START */}
+| Endpoint | Per-minute | Per-month |
+| -------- | ---------- | --------- |
+| `/v0/*` | 60 | 25,000 |
+| `/api/*` | 60 | 25,000 |
+{/* HOSTED-AUTOGEN:rate-limits-table:END */}
 
 Every request to `/v0/*` or `/api/*` counts as **1 request**, regardless
 of how much data it returns. Health checks are free.

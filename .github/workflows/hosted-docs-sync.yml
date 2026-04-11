@@ -1,0 +1,40 @@
+name: Sync hosted-pmxt docs
+
+on:
+  repository_dispatch:
+    types: [hosted-docs-update]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Write manifest
+        run: echo '${{ toJson(github.event.client_payload.manifest) }}' > .doc-manifest.json
+
+      - name: Apply hosted docs
+        run: node scripts/apply-hosted-manifest.js .doc-manifest.json
+
+      - name: Create PR if changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: sync/hosted-docs
+          title: 'docs: sync hosted-pmxt custom endpoints'
+          body: |
+            Auto-generated from hosted-pmxt doc manifest.
+
+            Updates:
+            - OpenAPI paths for custom hosted endpoints
+            - docs.json navigation
+            - Rate limit tables
+            - Catalog venue list
+          commit-message: 'docs: sync hosted-pmxt custom endpoints'
+          delete-branch: true

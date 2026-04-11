@@ -1,0 +1,273 @@
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const DOCS_DIR = path.resolve(__dirname, '..', 'docs');
+const OPENAPI_PATH = path.join(DOCS_DIR, 'api-reference', 'openapi.json');
+const DOCS_JSON_PATH = path.join(DOCS_DIR, 'docs.json');
+const RATE_LIMITS_PATH = path.join(DOCS_DIR, 'rate-limits.mdx');
+const VENUES_PATH = path.join(DOCS_DIR, 'concepts', 'venues.mdx');
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function readJson(filePath) {
+  const raw = fs.readFileSync(filePath, 'utf8');
+  return JSON.parse(raw);
+}
+
+function writeJson(filePath, data) {
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf8');
+}
+
+function readText(filePath) {
+  return fs.readFileSync(filePath, 'utf8');
+}
+
+function writeText(filePath, content) {
+  fs.writeFileSync(filePath, content, 'utf8');
+}
+
+/**
+ * Replace content between marker comments, or append markers + content if
+ * they don't exist yet.  Returns the updated text.
+ */
+function replaceBetweenMarkers(text, markerName, replacement, fallbackInsertBefore) {
+  const startTag = `{/* HOSTED-AUTOGEN:${markerName}:START */}`;
+  const endTag = `{/* HOSTED-AUTOGEN:${markerName}:END */}`;
+
+  const startIdx = text.indexOf(startTag);
+  const endIdx = text.indexOf(endTag);
+
+  if (startIdx !== -1 && endIdx !== -1) {
+    const before = text.slice(0, startIdx + startTag.length);
+    const after = text.slice(endIdx);
+    return `${before}\n${replacement}\n${after}`;
+  }
+
+  // Markers don't exist — insert them
+  const block = `\n${startTag}\n${replacement}\n${endTag}\n`;
+
+  if (fallbackInsertBefore) {
+    const insertIdx = text.indexOf(fallbackInsertBefore);
+    if (insertIdx !== -1) {
+      return text.slice(0, insertIdx) + block + '\n' + text.slice(insertIdx);
+    }
+  }
+
+  // Last resort: append
+  return text + block;
+}
+
+// ---------------------------------------------------------------------------
+// 1. Merge OpenAPI paths
+// ---------------------------------------------------------------------------
+
+function mergeOpenApiPaths(openApiPaths) {
+  if (!openApiPaths || Object.keys(openApiPaths).length === 0) {
+    console.log('  [openapi] No paths in manifest — skipping.');
+    return;
+  }
+
+  if (!fs.existsSync(OPENAPI_PATH)) {
+    console.warn(`  [openapi] WARN: ${OPENAPI_PATH} does not exist — skipping.`);
+    return;
+  }
+
+  const spec = readJson(OPENAPI_PATH);
+
+  // Build new paths object: start with existing, overlay hosted
+  const updatedPaths = { ...spec.paths, ...openApiPaths };
+
+  const updatedSpec = { ...spec, paths: updatedPaths };
+
+  writeJson(OPENAPI_PATH, updatedSpec);
+
+  const pathKeys = Object.keys(openApiPaths);
+  console.log(`  [openapi] Merged ${pathKeys.length} path(s): ${pathKeys.join(', ')}`);
+}
+
+// ---------------------------------------------------------------------------
+// 2. Update docs.json navigation
+// ---------------------------------------------------------------------------
+
+function buildNavPages(openApiPaths) {
+  return Object.entries(openApiPaths).flatMap(([pathKey, methods]) =>
+    Object.keys(methods).map((method) => `${method.toUpperCase()} ${pathKey}`)
+  );
+}
+
+function updateDocsNavigation(openApiPaths) {
+  if (!openApiPaths || Object.keys(openApiPaths).length === 0) {
+    console.log('  [docs.json] No paths — skipping.');
+    return;
+  }
+
+  if (!fs.existsSync(DOCS_JSON_PATH)) {
+    console.warn(`  [docs.json] WARN: ${DOCS_JSON_PATH} does not exist — skipping.`);
+    return;
+  }
+
+  const docsJson = readJson(DOCS_JSON_PATH);
+  const navPages = buildNavPages(openApiPaths);
+
+  const apiRefTab = docsJson.navigation.tabs.find(
+    (t) => t.tab === 'API Reference'
+  );
+
+  if (!apiRefTab) {
+    console.warn('  [docs.json] WARN: No "API Reference" tab found — skipping.');
+    return;
+  }
+
+  const routerGroup = apiRefTab.groups.find((g) => g.group === 'Router');
+
+  const newGroup = {
+    group: 'Router',
+    openapi: 'api-reference/openapi.json',
+    pages: navPages,
+  };
+
+  const updatedGroups = routerGroup
+    ? apiRefTab.groups.map((g) => (g.group === 'Router' ? newGroup : g))
+    : [...apiRefTab.groups, newGroup];
+
+  const updatedApiRefTab = { ...apiRefTab, groups: updatedGroups };
+  const updatedTabs = docsJson.navigation.tabs.map((t) =>
+    t.tab === 'API Reference' ? updatedApiRefTab : t
+  );
+  const updatedNavigation = { ...docsJson.navigation, tabs: updatedTabs };
+  const updatedDocsJson = { ...docsJson, navigation: updatedNavigation };
+
+  writeJson(DOCS_JSON_PATH, updatedDocsJson);
+  console.log(`  [docs.json] Router group updated with ${navPages.length} page(s).`);
+}
+
+// ---------------------------------------------------------------------------
+// 3. Update rate-limits.mdx
+// ---------------------------------------------------------------------------
+
+function buildRateLimitsTable(rateLimits) {
+  if (!rateLimits || rateLimits.length === 0) {
+    return '| Endpoint | Per-minute | Per-month |\n| -------- | ---------- | --------- |\n| (none)   | —          | —         |';
+  }
+
+  const header = '| Endpoint | Per-minute | Per-month |\n| -------- | ---------- | --------- |';
+  const rows = rateLimits.map(
+    (r) => `| \`${r.endpoint}\` | ${r.perMinute} | ${formatNumber(r.perMonth)} |`
+  );
+  return [header, ...rows].join('\n');
+}
+
+function formatNumber(n) {
+  if (n == null) return '—';
+  return n.toLocaleString('en-US');
+}
+
+function updateRateLimits(rateLimits) {
+  if (!rateLimits) {
+    console.log('  [rate-limits] No rateLimits in manifest — skipping.');
+    return;
+  }
+
+  if (!fs.existsSync(RATE_LIMITS_PATH)) {
+    console.warn(`  [rate-limits] WARN: ${RATE_LIMITS_PATH} does not exist — skipping.`);
+    return;
+  }
+
+  const text = readText(RATE_LIMITS_PATH);
+  const table = buildRateLimitsTable(rateLimits);
+  const updated = replaceBetweenMarkers(
+    text,
+    'rate-limits-table',
+    table,
+    '## Rate limit responses'
+  );
+  writeText(RATE_LIMITS_PATH, updated);
+  console.log(`  [rate-limits] Table updated with ${rateLimits.length} row(s).`);
+}
+
+// ---------------------------------------------------------------------------
+// 4. Update venues.mdx with catalog venues
+// ---------------------------------------------------------------------------
+
+function buildCatalogVenuesSection(catalogVenues) {
+  if (!catalogVenues || catalogVenues.length === 0) {
+    return '_No catalog venues configured._';
+  }
+
+  const header = '| Venue | Wire Key | Ingestion |\n| ----- | -------- | --------- |';
+  const rows = catalogVenues.map(
+    (v) => `| ${v.name} | \`${v.wireKey}\` | ${v.ingestion || 'polling'} |`
+  );
+  return `## Catalog Venues\n\nThe hosted catalog currently ingests the following venues:\n\n${[header, ...rows].join('\n')}`;
+}
+
+function updateVenues(catalogVenues) {
+  if (!catalogVenues) {
+    console.log('  [venues] No catalogVenues in manifest — skipping.');
+    return;
+  }
+
+  if (!fs.existsSync(VENUES_PATH)) {
+    console.warn(`  [venues] WARN: ${VENUES_PATH} does not exist — skipping.`);
+    return;
+  }
+
+  const text = readText(VENUES_PATH);
+  const section = buildCatalogVenuesSection(catalogVenues);
+  const updated = replaceBetweenMarkers(
+    text,
+    'catalog-venues',
+    section,
+    '## Feature support'
+  );
+  writeText(VENUES_PATH, updated);
+  console.log(`  [venues] Catalog venues updated with ${catalogVenues.length} venue(s).`);
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+function loadManifest(manifestPath) {
+  if (manifestPath && fs.existsSync(manifestPath)) {
+    return readJson(manifestPath);
+  }
+
+  // Try default
+  const defaultPath = path.resolve('.doc-manifest.json');
+  if (fs.existsSync(defaultPath)) {
+    return readJson(defaultPath);
+  }
+
+  return null;
+}
+
+function main() {
+  const manifestArg = process.argv[2] || null;
+  console.log('apply-hosted-manifest: starting…');
+
+  const manifest = loadManifest(manifestArg);
+
+  if (!manifest) {
+    console.error(
+      'ERROR: No manifest found. Pass a path as first argument or place .doc-manifest.json in cwd.'
+    );
+    process.exit(1);
+  }
+
+  console.log('Manifest loaded. Applying updates…');
+
+  mergeOpenApiPaths(manifest.openApiPaths);
+  updateDocsNavigation(manifest.openApiPaths);
+  updateRateLimits(manifest.rateLimits);
+  updateVenues(manifest.catalogVenues);
+
+  console.log('apply-hosted-manifest: done.');
+}
+
+main();

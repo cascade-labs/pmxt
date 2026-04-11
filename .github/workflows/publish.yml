@@ -67,6 +67,9 @@ jobs:
       - name: Build Core
         run: npm run build --workspace=pmxt-core
 
+      - name: Generate Mintlify docs
+        run: npm run generate:mintlify --workspace=pmxt-core
+
       - name: Bundle Sidecar Server
         run: npm run bundle:server --workspace=pmxt-core
 

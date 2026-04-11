@@ -12,7 +12,8 @@
         "dev": "concurrently \"npm --workspace=pmxt-core run build -- --watch\" \"npm run server --workspace=pmxt-core\"",
         "server": "npm run server --workspace=pmxt-core",
         "generate": "npm run generate:sdk:all --workspace=pmxt-core",
-        "test": "./scripts/verify-all.sh"
+        "test": "./scripts/verify-all.sh",
+        "docs:apply-hosted": "node scripts/apply-hosted-manifest.js"
     },
     "devDependencies": {
         "concurrently": "^9.2.1"
