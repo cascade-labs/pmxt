@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.30.0] - 2026-04-11
+
+### Added
+
+- **MCP docs page** (`docs/mcp.mdx`): New documentation page covering the hosted Streamable HTTP MCP server at `api.pmxt.dev/mcp`. Includes step-by-step setup for Claude Code, Cursor, and custom MCP clients, full tool reference table (read-only vs trading), authentication details, and comparison with the `@pmxt/mcp` npm package. Added to Mintlify navigation under Get Started.
+
 ## [2.29.0] - 2026-04-11
 
 ### Added

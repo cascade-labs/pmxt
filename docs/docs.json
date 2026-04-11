@@ -56,6 +56,7 @@
               "introduction",
               "quickstart",
               "authentication",
+              "mcp",
               "security",
               "rate-limits"
             ]
