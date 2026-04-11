@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.29.0] - 2026-04-11
+
+### Added
+
+- **MCP server for AI agents (`@pmxt/mcp`)**: New standalone repo ([pmxt-dev/pmxt-mcp](https://github.com/pmxt-dev/pmxt-mcp)) that exposes every PMXT REST API endpoint as an MCP tool. Agents running in Claude, ChatGPT, Cursor, or any MCP-compatible client can now discover markets, check prices, and place trades through PMXT with just an API key. 22 tools generated 1:1 from the OpenAPI spec — no abstraction layer. Destructive operations (createOrder, submitOrder, cancelOrder) are annotated for human-in-the-loop confirmation. Server instructions guide agents on setup, workflow, and credential handling. Install: `npx -y @pmxt/mcp` with `PMXT_API_KEY` set.
+- **CI/CD sync workflow** (`.github/workflows/sync-mcp.yml`): Every pmxt release automatically copies the latest OpenAPI spec to pmxt-mcp, regenerates tool definitions, bumps the version, and publishes `@pmxt/mcp` to npm. The MCP server stays in sync without manual intervention.
+
 ## [2.28.7] - 2026-04-11
 
 ### Added
