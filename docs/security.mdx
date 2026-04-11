@@ -1,0 +1,102 @@
+---
+title: Security & Credential Handling
+description: "How PMXT handles your venue credentials, what risks to understand, and how to protect yourself."
+---
+
+## How credentials flow
+
+When you make a trading call through the hosted API, your venue credentials
+follow this path:
+
+```
+Your app  ──HTTPS──>  api.pmxt.dev  ──signs locally──>  venue API
+                      (TLS terminates)   (in memory)       (HTTPS)
+```
+
+1. Your credentials travel **encrypted over TLS** to our Cloud Run container.
+2. pmxt-core's `sign()` method runs **inside the container** — it signs the
+   request using your key and sends only the **signature** to the venue.
+3. Your credentials are **garbage collected** after the request completes.
+
+**We never store, log, cache, or persist your venue credentials.** They exist
+in process memory only for the duration of the request.
+
+## What venues require
+
+Not all venues are equal. Some accept scoped API keys; others require raw
+wallet private keys with full fund control.
+
+| Venue | Credential type | Controls funds? |
+| ------------- | --------------------------------- | --------------- |
+| Polymarket | EVM private key | **Yes** |
+| Limitless | EVM private key | **Yes** |
+| Probable | EVM private key | **Yes** |
+| Opinion | EVM private key | **Yes** |
+| Baozi | Solana keypair | **Yes** |
+| Kalshi | RSA key pair (API-scoped) | No |
+| Smarkets | Email + password (session-scoped) | No |
+| Myriad | API key (read-scoped) | No |
+
+For on-chain venues (Polymarket, Limitless, Probable, Opinion, Baozi), there
+is no "scoped API key" option — the protocol requires a private key to sign
+transactions. This is the same for every trading bot, aggregator, and SDK
+that interacts with these venues.
+
+## Recommendations
+
+<Warning>
+**Use a dedicated trading wallet.** Do not use your primary wallet or a
+wallet holding funds beyond what you intend to trade. Create a separate
+wallet, fund it with only what you need, and use that wallet's private key
+with PMXT.
+</Warning>
+
+<Warning>
+**For maximum security, run pmxt locally.** The hosted API exists for
+convenience. If you are not comfortable sending your private key to a
+third-party server — even over HTTPS — you can run pmxt-core locally and
+retain full custody of your credentials. They will never leave your machine.
+
+```bash
+npm install pmxt-core
+# or
+pip install pmxt
+```
+
+See the [quickstart](/quickstart) for local setup.
+</Warning>
+
+### Best practices
+
+- **Rotate credentials regularly.** If a venue supports key rotation (Kalshi,
+  Polymarket L2 API keys), rotate on a schedule.
+- **Monitor your positions.** Set up alerts on your venue accounts for
+  unexpected trades or withdrawals.
+- **Limit wallet balances.** Keep only active trading capital in the wallet
+  you use with PMXT.
+- **Revoke unused PMXT API keys.** If you stop using the hosted API, revoke
+  your key from the [dashboard](https://pmxt.dev/dashboard) so it cannot be
+  used to make calls on your behalf.
+
+## Disclaimer
+
+**PMXT is provided "as is" without warranty of any kind.** By using the hosted
+API with venue credentials that control funds, you acknowledge and accept the
+following:
+
+- **You are solely responsible for the security of your credentials.** PMXT
+  processes your credentials ephemerally and does not store them, but you are
+  choosing to transmit them to a third-party service.
+- **PMXT is not responsible for any lost, stolen, or mismanaged funds.**
+  This includes but is not limited to losses arising from unauthorized
+  trades, venue API changes, software bugs, service outages, or security
+  incidents.
+- **On-chain transactions are irreversible.** Unlike traditional financial
+  systems, blockchain transactions cannot be reversed or charged back.
+  Funds sent or traded through on-chain venues are final.
+- **You should only risk what you can afford to lose.** Prediction markets
+  carry inherent financial risk independent of the software used to access
+  them.
+
+For users who require full custody and zero third-party trust, we strongly
+recommend the [local pmxt installation](/quickstart) over the hosted API.

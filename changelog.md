@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.28.7] - 2026-04-11
+
+### Added
+
+- **Security & Credential Handling docs page**: New `docs/security.mdx` covering the full credential flow (HTTPS → in-memory signing → venue API), per-venue credential type breakdown (which venues require raw wallet private keys vs. scoped API keys), dedicated trading wallet recommendation, liability disclaimer, and guidance to run pmxt locally for maximum custody. Added cross-link from `authentication.mdx` with an info callout warning about on-chain venue key requirements. Added to Mintlify navigation under Get Started.
+
 ## [2.28.6] - 2026-04-11
 
 ### Fixed
