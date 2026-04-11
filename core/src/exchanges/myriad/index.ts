@@ -27,6 +27,7 @@ export class MyriadExchange extends PredictionMarketExchange {
         watchAddress: false as const,
         unwatchAddress: false as const,
         watchOrderBook: 'emulated' as const,
+        unwatchOrderBook: false as const,
         watchTrades: 'emulated' as const,
         fetchMyTrades: true as const,
         fetchClosedOrders: false as const,

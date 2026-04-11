@@ -67,6 +67,7 @@ export class OpinionExchange extends PredictionMarketExchange {
         watchAddress: false as const,
         unwatchAddress: false as const,
         watchOrderBook: true as const,
+        unwatchOrderBook: false as const,
         watchTrades: true as const,
         fetchMyTrades: true as const,
         fetchClosedOrders: true as const,

@@ -72,6 +72,29 @@ export class PolymarketWebSocket {
         });
     }
 
+    async unwatchOrderBook(id: string): Promise<void> {
+        if (!this.manager) {
+            return;
+        }
+
+        await this.manager.removeSubscriptions([id]);
+
+        // Clear any pending resolvers for this asset
+        const resolvers = this.orderBookResolvers.get(id);
+        if (resolvers) {
+            this.orderBookResolvers = new Map(
+                [...this.orderBookResolvers].filter(([key]) => key !== id),
+            );
+        }
+
+        // Remove the cached orderbook for this asset
+        if (this.orderBooks.has(id)) {
+            this.orderBooks = new Map(
+                [...this.orderBooks].filter(([key]) => key !== id),
+            );
+        }
+    }
+
     async watchTrades(id: string, address?: string): Promise<Trade[]> {
         if (address) {
             return this.watcher.watch(address, ['trades'], id);

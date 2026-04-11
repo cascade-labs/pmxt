@@ -294,6 +294,16 @@
       }
     ]
   },
+  "unwatchOrderBook": {
+    "verb": "post",
+    "args": [
+      {
+        "name": "id",
+        "kind": "string",
+        "optional": false
+      }
+    ]
+  },
   "watchTrades": {
     "verb": "post",
     "args": [
@@ -341,6 +351,16 @@
         "name": "address",
         "kind": "string",
         "optional": false
+      }
+    ]
+  },
+  "testDummyMethod": {
+    "verb": "post",
+    "args": [
+      {
+        "name": "param",
+        "kind": "string",
+        "optional": true
       }
     ]
   },

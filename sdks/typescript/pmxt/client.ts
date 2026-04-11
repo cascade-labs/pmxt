@@ -975,6 +975,37 @@ export abstract class Exchange {
     }
 
     /**
+     * Unsubscribe from a previously watched order book stream.
+     *
+     * @param outcomeId - Outcome ID to stop watching
+     */
+    async unwatchOrderBook(outcomeId: string | MarketOutcome): Promise<void> {
+        await this.initPromise;
+        const resolvedOutcomeId = resolveOutcomeId(outcomeId);
+        try {
+            const args: any[] = [resolvedOutcomeId];
+
+            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/unwatchOrderBook`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
+                body: JSON.stringify({ args, credentials: this.getCredentials() }),
+            });
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                if (body.error && typeof body.error === "object") {
+                    throw fromServerError(body.error);
+                }
+                throw new PmxtError(body.error?.message || response.statusText);
+            }
+            const json = await response.json();
+            this.handleResponse(json);
+        } catch (error) {
+            if (error instanceof PmxtError) throw error;
+            throw new PmxtError(`Failed to unwatch order book: ${error}`);
+        }
+    }
+
+    /**
      * Watch real-time trade updates via WebSocket.
      * 
      * Returns a promise that resolves with the next trade(s).

@@ -65,6 +65,7 @@ export class PolymarketExchange extends PredictionMarketExchange {
         watchAddress: true as const,
         unwatchAddress: true as const,
         watchOrderBook: true as const,
+        unwatchOrderBook: true as const,
         watchTrades: true as const,
         fetchMyTrades: true as const,
         fetchClosedOrders: false as const,
@@ -509,6 +510,10 @@ export class PolymarketExchange extends PredictionMarketExchange {
 
     async watchOrderBook(id: string, limit?: number): Promise<OrderBook> {
         return this.ensureWs().watchOrderBook(id);
+    }
+
+    async unwatchOrderBook(id: string): Promise<void> {
+        return this.ensureWs().unwatchOrderBook(id);
     }
 
     async watchTrades(id: string, address?: string, since?: number, limit?: number): Promise<Trade[]> {

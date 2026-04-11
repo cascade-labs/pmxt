@@ -244,6 +244,8 @@ export interface ExchangeHas {
     unwatchAddress: ExchangeCapability;
     /** Whether this exchange supports streaming order book updates. */
     watchOrderBook: ExchangeCapability;
+    /** Whether this exchange supports unsubscribing from an order book stream. */
+    unwatchOrderBook: ExchangeCapability;
     /** Whether this exchange supports streaming trade updates. */
     watchTrades: ExchangeCapability;
     /** Whether this exchange supports fetching the authenticated user's trade history. */
@@ -327,6 +329,7 @@ export abstract class PredictionMarketExchange {
         watchAddress: false,
         unwatchAddress: false,
         watchOrderBook: false,
+        unwatchOrderBook: false,
         watchTrades: false,
         fetchMyTrades: false,
         fetchClosedOrders: false,
@@ -1058,6 +1061,15 @@ export abstract class PredictionMarketExchange {
      */
     async watchOrderBook(id: string, limit?: number): Promise<OrderBook> {
         throw new Error(`watchOrderBook() is not supported by ${this.name}`);
+    }
+
+    /**
+     * Unsubscribe from a previously watched order book stream.
+     *
+     * @param id - The Outcome ID to stop watching
+     */
+    async unwatchOrderBook(id: string): Promise<void> {
+        throw new Error(`unwatchOrderBook() is not supported by ${this.name}`);
     }
 
     // ----------------------------------------------------------------------------

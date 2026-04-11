@@ -1282,6 +1282,39 @@ class Exchange(ABC):
         except ApiException as e:
             raise self._parse_api_exception(e) from None
 
+    def unwatch_order_book(self, outcome_id: Union[str, "MarketOutcome"]) -> None:
+        """
+        Unsubscribe from a previously watched order book stream.
+
+        Args:
+            outcome_id: Outcome ID to stop watching
+
+        Returns:
+            None
+        """
+        try:
+            outcome_id = _resolve_outcome_id(outcome_id)
+            body: Dict[str, Any] = {"args": [outcome_id]}
+
+            creds = self._get_credentials_dict()
+            if creds:
+                body["credentials"] = creds
+
+            headers = {"Content-Type": "application/json", "Accept": "application/json"}
+            headers.update(self._get_auth_headers())
+
+            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/unwatchOrderBook"
+            response = self._api_client.call_api(
+                method="POST",
+                url=url,
+                body=body,
+                header_params=headers,
+            )
+            response.read()
+            return self._handle_response(json.loads(response.data))
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
+
     def watch_trades(
         self,
         outcome_id: Union[str, "MarketOutcome"],

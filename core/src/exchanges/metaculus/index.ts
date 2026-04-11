@@ -68,6 +68,7 @@ export class MetaculusExchange extends PredictionMarketExchange {
         watchAddress: false as const,
         unwatchAddress: false as const,
         watchOrderBook: false as const,
+        unwatchOrderBook: false as const,
         watchTrades: false as const,
         fetchMyTrades: false as const,
         fetchClosedOrders: false as const,

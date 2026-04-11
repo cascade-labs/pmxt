@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.28.0] - 2026-04-11
+
+### Added
+
+- **`unwatchOrderBook` / `unwatch_order_book` for per-asset WebSocket unsubscription** (issue #79): Previously the only way to stop receiving order book updates was `close()`, which tore down all WebSocket connections across all assets. Users streaming multiple assets (e.g. rotating through 5-minute Polymarket markets) accumulated subscriptions with no way to release individual ones, causing unbounded bandwidth growth — reported as 300+ Mbps in issue #79. Added `unwatchOrderBook(id)` across the full stack: `BaseExchange` stub, Polymarket implementation (calls `WSSubscriptionManager.removeSubscriptions`, clears pending resolvers and cached order book state), sidecar POST route, and both SDKs (`unwatchOrderBook` in TypeScript, `unwatch_order_book` in Python). All other exchanges declare `unwatchOrderBook: false` in their capabilities until they add support. The method is safe to call on assets that were never watched — it returns successfully with no side effects.
+
 ## [2.27.10] - 2026-04-11
 
 ### Fixed

@@ -61,6 +61,7 @@ export class LimitlessExchange extends PredictionMarketExchange {
         watchAddress: true as const,
         unwatchAddress: true as const,
         watchOrderBook: true as const,
+        unwatchOrderBook: false as const,
         watchTrades: true as const,
         fetchMyTrades: true as const,
         fetchClosedOrders: true as const,
