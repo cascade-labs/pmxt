@@ -47,7 +47,7 @@ jobs:
       - name: Update version
         run: |
           cd /tmp/pmxt-mcp
-          npm version ${{ steps.get_version.outputs.version }} --no-git-tag-version
+          npm version ${{ steps.get_version.outputs.version }} --no-git-tag-version --allow-same-version
 
       - name: Commit and push
         run: |
