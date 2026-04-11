@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.30.1] - 2026-04-11
+
+### Fixed
+
+- **MCP publish failed on provenance mismatch**: The `--provenance` flag in `sync-mcp.yml` requires the publishing repo to match the package's `repository.url`, but the workflow runs from `pmxt-dev/pmxt` while publishing a package cloned from `pmxt-dev/pmxt-mcp`. Removed `--provenance` from the npm publish step.
+
 ## [2.30.0] - 2026-04-11
 
 ### Added
