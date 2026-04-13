@@ -2,7 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## 2.30.3 (2026-04-12)
+## [2.30.4] - 2026-04-13
+
+### Bug Fixes
+
+- **MCP: query parameters dropped for all GET methods**: `fetchEvents`,
+  `fetchMarkets`, and other GET-based tools had `flatten: false` on their
+  single object arg, causing `reconstructArgs` to look for `input["params"]`
+  instead of collecting the flat query properties (`query`, `limit`, etc.).
+  All parameters were silently dropped, making the inner API call return
+  unlimited results and OOM the hosted Cloud Run instance. Fixed by setting
+  `flatten: true` for GET methods with a single object arg in
+  `generate-tools.cjs`.
+
+## [2.30.3] - 2026-04-12
 
 ### Bug Fixes
 
