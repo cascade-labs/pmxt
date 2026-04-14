@@ -316,7 +316,7 @@ describe('LimitlessNormalizer.normalizePosition', () => {
         expect(pos.currentPrice).toBeCloseTo(0.7);
     });
 
-    test('should fall back to conditionId when market.slug is missing', () => {
+    test('should throw when market.slug is missing', () => {
         const raw = {
             conditionId: 'cond-abc',
             asset: 'token-no',
@@ -324,7 +324,6 @@ describe('LimitlessNormalizer.normalizePosition', () => {
             avgPrice: '0.40',
         };
 
-        const pos = normalizer.normalizePosition(raw);
-        expect(pos.marketId).toBe('cond-abc');
+        expect(() => normalizer.normalizePosition(raw)).toThrow('Position missing market.slug');
     });
 });

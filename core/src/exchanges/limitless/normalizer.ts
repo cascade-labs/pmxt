@@ -120,8 +120,12 @@ export class LimitlessNormalizer implements IExchangeNormalizer<LimitlessRawMark
 
     normalizePosition(raw: unknown): Position {
         const p = raw as any;
+        const slug = p.market?.slug;
+        if (!slug) {
+            throw new Error(`Position missing market.slug (conditionId=${p.conditionId})`);
+        }
         return {
-            marketId: p.market?.slug || p.conditionId,
+            marketId: slug,
             outcomeId: p.asset,
             outcomeLabel: p.outcome || 'Unknown',
             size: parseFloat(p.size || '0'),

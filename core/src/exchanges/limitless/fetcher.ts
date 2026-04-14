@@ -194,7 +194,8 @@ export class LimitlessFetcher implements IExchangeFetcher<LimitlessRawMarket, Li
 
     async fetchRawPositions(account: string): Promise<unknown[]> {
         const result = await this.ctx.callApi('PublicPortfolioController_getPositions', { account });
-        return result?.data || result || [];
+        const raw: any[] = Array.isArray(result?.data) ? result.data : Array.isArray(result) ? result : [];
+        return raw.filter((p: any) => p.market?.slug);
     }
 
     // -- Private helpers -------------------------------------------------------

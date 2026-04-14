@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.30.8] - 2026-04-14
+
+### Bug Fixes
+
+- **limitless: position `marketId` falls back to `conditionId` (wrong ID space)**
+  ([#88](https://github.com/pmxt-dev/pmxt/issues/88)):
+  Same bug class as Polymarket #83. When `market.slug` was missing from a
+  position, the normalizer fell back to `conditionId` — an on-chain bytes32
+  hash that the Limitless API does not accept. `fetchMarket(position.marketId)`
+  always failed. Fixed by filtering out positions without `market.slug` in the
+  fetcher and throwing in the normalizer if one slips through.
+
 ## [2.30.7] - 2026-04-14
 
 ### Bug Fixes
