@@ -544,9 +544,6 @@ export class LimitlessExchange extends PredictionMarketExchange {
                     .then((positions) => {
                         result.positions = positions;
                     })
-                    .catch(() => {
-                        result.positions = [];
-                    })
             );
         }
 
@@ -555,9 +552,6 @@ export class LimitlessExchange extends PredictionMarketExchange {
                 this.getAddressOnChainBalance(address)
                     .then((balances) => {
                         result.balances = balances;
-                    })
-                    .catch(() => {
-                        result.balances = [];
                     })
             );
         }
