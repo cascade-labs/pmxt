@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.30.7] - 2026-04-14
+
+### Bug Fixes
+
+- **watcher: empty catch block causes promises to hang forever**
+  ([#90](https://github.com/pmxt-dev/pmxt/issues/90)):
+  `AddressWatcher.handleSubscriptionData` had an empty `catch { }` that
+  silently swallowed all errors — network failures, malformed responses,
+  `buildActivity` crashes. Pending `watch()` promises were never resolved
+  or rejected, causing callers to hang indefinitely with no indication of
+  failure. Fixed by rejecting all pending resolvers (both address-level
+  and asset-filtered) with the actual error.
+
+- **polymarket: silent `.catch()` hides trades/balances fetch errors**
+  ([#84](https://github.com/pmxt-dev/pmxt/issues/84)):
+  `fetchWatchedAddressActivity` caught errors from `getTrades` and
+  `getAddressOnChainBalance` and silently replaced them with empty arrays.
+  Downstream consumers could not distinguish "API is down" from "no data".
+  Combined with the watcher empty catch (#90), this formed a double-catch
+  chain where errors vanished at two layers. Removed both `.catch()` blocks
+  so errors propagate to the watcher, which now rejects waiting promises.
+
 ## [2.30.6] - 2026-04-14
 
 ### Bug Fixes
