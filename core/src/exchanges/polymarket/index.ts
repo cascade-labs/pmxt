@@ -681,9 +681,6 @@ export class PolymarketExchange extends PredictionMarketExchange {
                                     : 'unknown' as const,
                             outcomeId: t.asset ?? undefined,
                         }));
-                    })
-                    .catch(() => {
-                        result.trades = [];
                     }),
             );
         }
@@ -702,9 +699,6 @@ export class PolymarketExchange extends PredictionMarketExchange {
                 this.getAddressOnChainBalance(address)
                     .then(b => {
                         result.balances = b;
-                    })
-                    .catch(() => {
-                        result.balances = [];
                     }),
             );
         }
