@@ -505,3 +505,35 @@ class EventFilterCriteria(TypedDict, total=False):
 
 EventFilterFunction = Callable[[UnifiedEvent], bool]
 
+
+class MarketFetchParams(TypedDict, total=False):
+    """Parameters for fetching markets."""
+    query: str
+    limit: int
+    offset: int
+    sort: Literal["volume", "liquidity", "newest"]
+    status: Literal["active", "inactive", "closed", "all"]
+    search_in: Literal["title", "description", "both"]
+    slug: str
+    market_id: str
+    outcome_id: str
+    event_id: str
+    category: str
+    tags: List[str]
+    filter: MarketFilterCriteria
+
+
+class EventFetchParams(TypedDict, total=False):
+    """Parameters for fetching events."""
+    query: str
+    limit: int
+    offset: int
+    sort: Literal["volume", "liquidity", "newest"]
+    status: Literal["active", "inactive", "closed", "all"]
+    search_in: Literal["title", "description", "both"]
+    event_id: str
+    slug: str
+    category: str
+    tags: List[str]
+    filter: EventFilterCriteria
+

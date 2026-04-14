@@ -484,6 +484,8 @@ const TYPE_REF_MAP = {
   MyTradesParams: 'MyTradesParams',
   OrderHistoryParams: 'OrderHistoryParams',
   BuiltOrder: 'BuiltOrder',
+  MarketFilterCriteria: 'MarketFilterCriteria',
+  EventFilterCriteria: 'EventFilterCriteria',
 };
 
 // ---------------------------------------------------------------------------
@@ -1136,6 +1138,9 @@ const GENERATED_SCHEMA_ORDER = [
   'BuiltOrder',
   'MyTradesParams',
   'OrderHistoryParams',
+  // Filtering criteria
+  'MarketFilterCriteria',
+  'EventFilterCriteria',
   // Auth
   'ExchangeCredentials',
 ];

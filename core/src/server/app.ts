@@ -86,6 +86,13 @@ const METHOD_VERBS = loadMethodVerbs();
  */
 function coerceQueryValue(raw: unknown, kind?: MethodArgKind): unknown {
   if (Array.isArray(raw)) return raw.map((v) => coerceQueryValue(v, kind));
+  if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      result[k] = coerceQueryValue(v);
+    }
+    return result;
+  }
   if (typeof raw !== "string") return raw;
   if (kind === "string") return raw;
   if (kind === "number") {
@@ -102,6 +109,9 @@ function coerceQueryValue(raw: unknown, kind?: MethodArgKind): unknown {
   if (raw === "true") return true;
   if (raw === "false") return false;
   if (raw === "null") return null;
+  if (raw.startsWith("{") || raw.startsWith("[")) {
+    try { return JSON.parse(raw); } catch { /* fall through */ }
+  }
   if (/^-?\d+$/.test(raw)) return parseInt(raw, 10);
   if (/^-?\d*\.\d+$/.test(raw)) return parseFloat(raw);
   return raw;

@@ -70,6 +70,12 @@ export interface MarketFilterParams {
 }
 
 export interface MarketFetchParams extends MarketFilterParams {
+    /** Optional client-side filter applied after fetching */
+    filter?: MarketFilterCriteria;
+    /** Shorthand for filter.category -- merged into filter (takes precedence) */
+    category?: string;
+    /** Shorthand for filter.tags -- merged into filter (takes precedence) */
+    tags?: string[];
 }
 
 export interface EventFetchParams {
@@ -85,6 +91,12 @@ export interface EventFetchParams {
     searchIn?: 'title' | 'description' | 'both';
     eventId?: string;    // Direct lookup by event ID
     slug?: string;       // Lookup by event slug
+    /** Optional client-side filter applied after fetching */
+    filter?: EventFilterCriteria;
+    /** Shorthand for filter.category -- merged into filter (takes precedence) */
+    category?: string;
+    /** Shorthand for filter.tags -- merged into filter (takes precedence) */
+    tags?: string[];
 }
 
 /**
@@ -151,7 +163,7 @@ export interface OrderHistoryParams {
 // Filtering Types
 // ----------------------------------------------------------------------------
 
-export type MarketFilterCriteria = {
+export interface MarketFilterCriteria {
     // Text search
     text?: string;
     searchIn?: ('title' | 'description' | 'category' | 'tags' | 'outcomes')[]; // Default: ['title']
@@ -188,11 +200,11 @@ export type MarketFilterCriteria = {
         min?: number; // e.g., -0.1 for 10% drop
         max?: number;
     };
-};
+}
 
 export type MarketFilterFunction = (market: UnifiedMarket) => boolean;
 
-export type EventFilterCriteria = {
+export interface EventFilterCriteria {
     // Text search
     text?: string;
     searchIn?: ('title' | 'description' | 'category' | 'tags')[]; // Default: ['title']
@@ -205,7 +217,7 @@ export type EventFilterCriteria = {
     // Filter by contained markets
     marketCount?: { min?: number; max?: number };
     totalVolume?: { min?: number; max?: number }; // Sum of market volumes
-};
+}
 
 export type EventFilterFunction = (event: UnifiedEvent) => boolean;
 
@@ -489,7 +501,31 @@ export abstract class PredictionMarketExchange {
      * @note Some exchanges (like Limitless) may only support status 'active' for search results.
      */
     async fetchMarkets(params?: MarketFetchParams): Promise<UnifiedMarket[]> {
-        return this.fetchMarketsImpl(params);
+        const { filter, category, tags, ...fetchParams } = params ?? {};
+        // Merge explicit category/tags into the filter (explicit params take precedence)
+        const mergedFilter: MarketFilterCriteria = {
+            ...(filter ?? {}),
+            ...(category !== undefined ? { category } : {}),
+            ...(tags !== undefined ? { tags } : {}),
+        };
+        const hasFilter = Object.keys(mergedFilter).length > 0;
+        if (hasFilter) {
+            // When filtering, pull limit/offset out of the venue fetch so
+            // the venue returns enough data for the filter to work with.
+            // Apply limit/offset after filtering so the caller gets the
+            // number of results they asked for.
+            const { limit, offset, ...venueParams } = fetchParams;
+            const markets = await this.fetchMarketsImpl(
+                Object.keys(venueParams).length > 0 ? venueParams : undefined
+            );
+            const filtered = this.filterMarkets(markets, mergedFilter);
+            const start = offset ?? 0;
+            return limit !== undefined ? filtered.slice(start, start + limit) : filtered.slice(start);
+        }
+        const markets = await this.fetchMarketsImpl(
+            Object.keys(fetchParams).length > 0 ? fetchParams : undefined
+        );
+        return markets;
     }
 
     /**
@@ -507,9 +543,13 @@ export abstract class PredictionMarketExchange {
      * @param params.cursor     - Opaque cursor returned by a previous call
      * @returns PaginatedMarketsResult with data, total, and optional nextCursor
      */
-    async fetchMarketsPaginated(params?: { limit?: number; cursor?: string }): Promise<PaginatedMarketsResult> {
+    async fetchMarketsPaginated(params?: { limit?: number; cursor?: string; filter?: MarketFilterCriteria }): Promise<PaginatedMarketsResult> {
         const limit = params?.limit;
         const cursor = params?.cursor;
+        const filter = params?.filter;
+
+        const applyFilter = (markets: UnifiedMarket[]): UnifiedMarket[] =>
+            filter ? this.filterMarkets(markets, filter) : markets;
 
         if (cursor) {
             // Cursor encodes: snapshotId:offset
@@ -530,7 +570,7 @@ export abstract class PredictionMarketExchange {
             const nextOffset = offset + slice.length;
             const nextCursor = nextOffset < markets.length ? `${snapshotId}:${nextOffset}` : undefined;
 
-            return { data: slice, total: markets.length, nextCursor };
+            return { data: applyFilter(slice), total: markets.length, nextCursor };
         }
 
         // No cursor — (re)fetch snapshot
@@ -549,12 +589,12 @@ export abstract class PredictionMarketExchange {
 
         const markets = this._snapshot.markets;
         if (!limit) {
-            return { data: markets, total: markets.length, nextCursor: undefined };
+            return { data: applyFilter(markets), total: markets.length, nextCursor: undefined };
         }
 
         const slice = markets.slice(0, limit);
         const nextCursor = limit < markets.length ? `${this._snapshot.id}:${limit}` : undefined;
-        return { data: slice, total: markets.length, nextCursor };
+        return { data: applyFilter(slice), total: markets.length, nextCursor };
     }
 
     /**
@@ -571,7 +611,23 @@ export abstract class PredictionMarketExchange {
      * @note Some exchanges (like Limitless) may only support status 'active' for search results.
      */
     async fetchEvents(params?: EventFetchParams): Promise<UnifiedEvent[]> {
-        return this.fetchEventsImpl(params ?? {});
+        const { filter, category, tags, ...fetchParams } = params ?? {};
+        // Merge explicit category/tags into the filter (explicit params take precedence)
+        const mergedFilter: EventFilterCriteria = {
+            ...(filter ?? {}),
+            ...(category !== undefined ? { category } : {}),
+            ...(tags !== undefined ? { tags } : {}),
+        };
+        const hasFilter = Object.keys(mergedFilter).length > 0;
+        if (hasFilter) {
+            const { limit, offset, ...venueParams } = fetchParams;
+            const events = await this.fetchEventsImpl(venueParams);
+            const filtered = this.filterEvents(events, mergedFilter);
+            const start = offset ?? 0;
+            return limit !== undefined ? filtered.slice(start, start + limit) : filtered.slice(start);
+        }
+        const events = await this.fetchEventsImpl(fetchParams);
+        return events;
     }
 
     /**

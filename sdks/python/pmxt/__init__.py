@@ -50,6 +50,10 @@ from .models import (
     BuiltOrder,
     Position,
     Balance,
+    MarketFilterCriteria,
+    EventFilterCriteria,
+    MarketFetchParams,
+    EventFetchParams,
 )
 
 

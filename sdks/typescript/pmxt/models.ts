@@ -336,6 +336,53 @@ export interface MarketFilterParams {
 
     /** Where to search (for filterMarkets) */
     searchIn?: SearchIn;
+
+    /** Filter by market category (e.g. "sports", "politics", "crypto") */
+    category?: string;
+
+    /** Filter by tags attached to the market */
+    tags?: string[];
+
+    /** Optional client-side filter applied after fetching */
+    filter?: MarketFilterCriteria;
+}
+
+/**
+ * Parameters for fetching events.
+ */
+export interface EventFetchParams {
+    /** Keyword search */
+    query?: string;
+
+    /** Maximum number of results */
+    limit?: number;
+
+    /** Pagination offset */
+    offset?: number;
+
+    /** Sort order */
+    sort?: SortOption;
+
+    /** Filter by event status */
+    status?: 'active' | 'inactive' | 'closed' | 'all';
+
+    /** Where to search */
+    searchIn?: SearchIn;
+
+    /** Direct lookup by event ID */
+    eventId?: string;
+
+    /** Lookup by event slug */
+    slug?: string;
+
+    /** Filter by event category (e.g. "sports", "politics", "crypto") */
+    category?: string;
+
+    /** Filter by tags attached to the event */
+    tags?: string[];
+
+    /** Optional client-side filter applied after fetching */
+    filter?: EventFilterCriteria;
 }
 
 /**

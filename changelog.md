@@ -2,13 +2,95 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.31.0] - 2026-04-14
+
+### New Features
+
+- **Inline filtering on `fetchMarkets` / `fetchEvents` / `fetchMarketsPaginated`**
+
+  `category` and `tags` are now top-level params on every fetch method:
+
+  ```python
+  # Python
+  poly.fetch_events(query="election", limit=10, category="Politics")
+  poly.fetch_markets(query="Trump", limit=10, tags=["Bitcoin"])
+  ```
+
+  ```typescript
+  // TypeScript
+  await poly.fetchEvents({ query: "election", limit: 10, category: "Politics" });
+  await poly.fetchMarkets({ query: "Trump", limit: 10, tags: ["Bitcoin"] });
+  ```
+
+  For advanced criteria (volume ranges, price filters, date ranges, etc.), pass
+  a `filter` object — it accepts the full `MarketFilterCriteria` /
+  `EventFilterCriteria`:
+
+  ```python
+  poly.fetch_markets(
+      query="election",
+      category="Politics",
+      filter={"volume24h": {"min": 10000}},
+  )
+  ```
+
+  Top-level `category` / `tags` take precedence over the same fields inside
+  `filter` when both are provided.
+
+  `limit` and `offset` are applied **after** filtering, so
+  `fetch_events(limit=10, category="Politics")` returns 10 Politics events —
+  not "up to 10 events, some of which happen to be Politics."
+
+- **Express sidecar: deep object coercion**
+
+  The sidecar now recursively coerces nested query-string objects
+  (`?filter[volume24h][min]=1000`) and accepts JSON-encoded filter values
+  (`?filter={"category":"Politics"}`), so HTTP clients that bypass the SDK can
+  use the new filter param directly.
+
+- **OpenAPI spec: `MarketFilterCriteria` and `EventFilterCriteria` schemas**
+
+  Both are now named component schemas in the generated spec, and the `filter`,
+  `category`, and `tags` params appear on all relevant endpoints.
+
 ## [2.30.9] - 2026-04-14
 
 ### Bug Fixes
 
+<<<<<<< Updated upstream
 - **polymarket_us: orderbook validation, auth test, and compliance timeouts**
   Corrected PolymarketUS orderbook validation, auth test assertions, and
   compliance test timeouts.
+=======
+- **limitless: `fetchWatchedAddressActivity` silently swallows errors**
+  ([#85](https://github.com/pmxt-dev/pmxt/issues/85)):
+  Two `.catch()` handlers silently replaced errors from `fetchPositions` and
+  `getAddressOnChainBalance` with empty arrays. Same pattern as Polymarket #84.
+  Removed both so errors propagate naturally.
+
+- **probable: fetcher/normalizer silently convert bad responses to empty arrays**
+  ([#86](https://github.com/pmxt-dev/pmxt/issues/86)):
+  Nine fallback patterns in the fetcher (`data?.history || data || []`, etc.)
+  silently returned empty results for malformed API responses. The normalizer
+  compounded this with multi-field fallback chains (`raw.qty || raw.size ||
+  raw.amount || '0'`). Replaced all with explicit shape validation and
+  single canonical field names.
+
+- **polymarket_us: silent fallbacks on required SDK response fields**
+  ([#87](https://github.com/pmxt-dev/pmxt/issues/87)):
+  Five data-fetching methods used `|| []` / `|| {}` on fields the SDK types
+  declare as required. A missing field always means a broken response, not
+  "no results". Replaced with explicit validation that throws. Also removed
+  the `submitOrder()` catch-and-synthesize pattern that constructed a fake
+  Order with `filled: 0, status: 'open'` when `fetchOrder()` failed.
+
+- **opinion: `normalizeOrder` sets `outcomeId` to `marketId` (wrong ID space)**
+  ([#89](https://github.com/pmxt-dev/pmxt/issues/89)):
+  `outcomeId` was set to `String(raw.marketId)`, making all orders on the same
+  market indistinguishable (Yes vs No). Derived from `raw.outcome` /
+  `raw.outcomeSide` instead. Also replaced `|| ''` fallbacks on required token
+  IDs with throws.
+>>>>>>> Stashed changes
 
 ## [2.30.8] - 2026-04-14
 
