@@ -252,6 +252,22 @@ describe('OpinionNormalizer.normalizeMarket', () => {
         expect(normalizer.normalizeMarket(undefined as any)).toBeNull();
     });
 
+    test('should throw when yesTokenId is missing', () => {
+        const noYesToken: OpinionRawMarket = {
+            ...RAW_BINARY_MARKET,
+            yesTokenId: '',
+        };
+        expect(() => normalizer.normalizeMarket(noYesToken)).toThrow('missing yesTokenId');
+    });
+
+    test('should throw when noTokenId is missing', () => {
+        const noNoToken: OpinionRawMarket = {
+            ...RAW_BINARY_MARKET,
+            noTokenId: '',
+        };
+        expect(() => normalizer.normalizeMarket(noNoToken)).toThrow('missing noTokenId');
+    });
+
     test('should handle missing optional string fields', () => {
         const minimal: OpinionRawMarket = {
             marketId: 999,
@@ -262,8 +278,8 @@ describe('OpinionNormalizer.normalizeMarket', () => {
             yesLabel: '',
             noLabel: '',
             rules: '',
-            yesTokenId: '',
-            noTokenId: '',
+            yesTokenId: 'yes-token',
+            noTokenId: 'no-token',
             conditionId: '',
             volume: '',
             volume24h: '',
@@ -634,6 +650,7 @@ describe('OpinionNormalizer.normalizeOrder', () => {
 
         expect(order.id).toBe('order-001');
         expect(order.marketId).toBe('100');
+        expect(order.outcomeId).toBe('Yes');
         expect(order.side).toBe('buy');
         expect(order.type).toBe('limit');
         expect(order.price).toBeCloseTo(0.65);
@@ -641,6 +658,23 @@ describe('OpinionNormalizer.normalizeOrder', () => {
         expect(order.filled).toBe(30);
         expect(order.remaining).toBe(70);
         expect(order.status).toBe('pending');
+    });
+
+    test('should set outcomeId from outcome field, not marketId', () => {
+        const order = normalizer.normalizeOrder(RAW_ORDER);
+        // outcomeId must identify which outcome (Yes/No), not which market
+        expect(order.outcomeId).not.toBe(String(RAW_ORDER.marketId));
+        expect(order.outcomeId).toBe('Yes');
+    });
+
+    test('should derive outcomeId from outcomeSide when outcome is empty', () => {
+        const noOutcomeOrder: OpinionRawOrder = {
+            ...RAW_ORDER,
+            outcome: '',
+            outcomeSide: 2,
+        };
+        const order = normalizer.normalizeOrder(noOutcomeOrder);
+        expect(order.outcomeId).toBe('No');
     });
 
     test('should map sell side (side=2)', () => {

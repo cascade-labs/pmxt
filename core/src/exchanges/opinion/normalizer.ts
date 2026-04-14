@@ -208,7 +208,7 @@ export class OpinionNormalizer implements IExchangeNormalizer<OpinionRawMarket, 
         return {
             id: raw.orderId || '',
             marketId: String(raw.marketId),
-            outcomeId: String(raw.marketId),
+            outcomeId: raw.outcome || (raw.outcomeSide === 1 ? 'Yes' : 'No'),
             side: raw.side === 1 ? 'buy' : 'sell',
             type: raw.tradingMethod === 2 ? 'limit' : 'market',
             price: parseNumStr(raw.price),
@@ -227,15 +227,22 @@ export class OpinionNormalizer implements IExchangeNormalizer<OpinionRawMarket, 
 
         const marketId = String(raw.marketId);
 
+        if (!raw.yesTokenId) {
+            throw new Error(`Opinion market ${marketId} is missing yesTokenId`);
+        }
+        if (!raw.noTokenId) {
+            throw new Error(`Opinion market ${marketId} is missing noTokenId`);
+        }
+
         const yesOutcome: MarketOutcome = {
-            outcomeId: raw.yesTokenId || '',
+            outcomeId: raw.yesTokenId,
             marketId,
             label: raw.yesLabel || 'Yes',
             price: 0.5,
         };
 
         const noOutcome: MarketOutcome = {
-            outcomeId: raw.noTokenId || '',
+            outcomeId: raw.noTokenId,
             marketId,
             label: raw.noLabel || 'No',
             price: 0.5,
@@ -265,15 +272,22 @@ export class OpinionNormalizer implements IExchangeNormalizer<OpinionRawMarket, 
 
         const marketId = String(child.marketId);
 
+        if (!child.yesTokenId) {
+            throw new Error(`Opinion child market ${marketId} is missing yesTokenId`);
+        }
+        if (!child.noTokenId) {
+            throw new Error(`Opinion child market ${marketId} is missing noTokenId`);
+        }
+
         const yesOutcome: MarketOutcome = {
-            outcomeId: child.yesTokenId || '',
+            outcomeId: child.yesTokenId,
             marketId,
             label: child.yesLabel || 'Yes',
             price: 0.5,
         };
 
         const noOutcome: MarketOutcome = {
-            outcomeId: child.noTokenId || '',
+            outcomeId: child.noTokenId,
             marketId,
             label: child.noLabel || 'No',
             price: 0.5,
