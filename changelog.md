@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.31.2] - 2026-04-20
+
+### Bug Fixes
+
+- **Polymarket `fetchPositions` returns empty array when positions exist**
+  ([#99](https://github.com/pmxt-dev/pmxt/issues/99)):
+  `enrichPositionsWithMarketIds` silently dropped all positions whose
+  `conditionId` the Gamma API could not resolve. Positions with unresolvable
+  `conditionId`s are now retained with an empty `marketId`.
+- **Polymarket `fetchPositions` missing small positions**: The Data API's
+  `sizeThreshold` parameter defaults to `1` server-side, filtering out
+  fractional positions. Now explicitly set to `0` to return all positions
+  regardless of size.
+
 ## [2.31.1] - 2026-04-18
 
 ### Bug Fixes
