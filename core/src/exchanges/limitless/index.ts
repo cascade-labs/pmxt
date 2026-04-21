@@ -466,7 +466,7 @@ export class LimitlessExchange extends PredictionMarketExchange {
         //
         // Static network avoids ethers v5 auto-detect (eth_chainId), which can throw
         // noNetwork / NETWORK_ERROR on flaky public RPCs (#92).
-        const provider = new providers.JsonRpcProvider('https://mainnet.base.org', {
+        const provider = new providers.StaticJsonRpcProvider('https://mainnet.base.org', {
             chainId: 8453,
             name: 'base',
         });
