@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.31.3] - 2026-04-21
+
+### Bug Fixes
+
+- **Spurious `noNetwork` errors on `watchAddress` and `fetchBalance`**
+  ([#92](https://github.com/pmxt-dev/pmxt/issues/92)):
+  ethers v5's `JsonRpcProvider` auto-detects the network via `eth_chainId` on
+  every instantiation. When public RPCs are slow or rate-limited, this fails
+  with `NETWORK_ERROR` / `noNetwork`. Switched all three provider call sites
+  (Polymarket, Limitless exchange, Limitless client) to `StaticJsonRpcProvider`
+  with explicit chain IDs, which skips auto-detection entirely.
+
 ## [2.31.2] - 2026-04-20
 
 ### Bug Fixes
