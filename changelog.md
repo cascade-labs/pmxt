@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.31.4] - 2026-04-21
+
+### Bug Fixes
+
+- **`fetchMarkets` / `fetchEvents` ignore `offset` and `limit` without a filter**
+  ([#95](https://github.com/pmxt-dev/pmxt/issues/95)):
+  When no filter was provided, `BaseExchange` passed `offset`/`limit` through to
+  the venue implementation and returned the result without slicing. No venue
+  implementation actually honored `offset`, so all offset values returned the
+  same results. The no-filter branch now applies `slice(offset, offset + limit)`
+  the same way the with-filter branch already did.
+
 ## [2.31.3] - 2026-04-21
 
 ### Bug Fixes
