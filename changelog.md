@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.32.4] - 2026-04-22
+
+### Bug Fixes
+
+- **Limitless `fetchOrderBook` outcomeId resolution moved to hosted API**
+  ([#104](https://github.com/pmxt-dev/pmxt/issues/104)):
+  The 2.32.3 cache-based `resolveToSlug` approach was unreliable because
+  `loadMarkets()` only returns active markets (~306). Removed the local
+  resolution. The Limitless API requires a slug for `fetchOrderBook`; hosted
+  PMXT users (`pmxt_api_key`) get transparent outcomeId-to-slug resolution
+  via the hosted API's DB. Direct SDK users should pass `market.marketId`
+  (the slug) instead of `outcome.outcomeId`.
+
 ## [2.32.3] - 2026-04-22
 
 ### Bug Fixes
