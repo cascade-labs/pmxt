@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.33.1] - 2026-04-22
+
+### Bug Fixes
+
+- **`MatchRelation` breaks SDK generation**: `MatchRelation` (a type alias for
+  `'identity' | 'subset' | 'superset' | 'overlap' | 'disjoint'`) was added to
+  `TYPE_REF_MAP`, causing the OpenAPI generator to emit a `$ref` to a
+  non-existent component schema. The openapi-generator-cli rejected the spec
+  with 4 validation errors. Removed `MatchRelation` from `TYPE_REF_MAP` so it
+  resolves inline as a string enum via `TYPE_ALIAS_REGISTRY`, matching how
+  `CandleInterval` and other type aliases are handled.
+
 ## [2.33.0] - 2026-04-22
 
 ### New Features
