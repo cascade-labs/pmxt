@@ -27,7 +27,15 @@ export class Router {
 
     async fetchMatches(params: FetchMatchesParams): Promise<MatchResult[]> {
         const response = await this.client.getMarketMatches(params);
-        return response.matches ?? [];
+        const matches = response.matches ?? [];
+        return matches.map((m: any) => ({
+            market: m.market,
+            relation: m.relation,
+            confidence: m.confidence,
+            reasoning: m.reasoning ?? null,
+            bestBid: m.market?.bestBid ?? null,
+            bestAsk: m.market?.bestAsk ?? null,
+        }));
     }
 
     // -----------------------------------------------------------------------
