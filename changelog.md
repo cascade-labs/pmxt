@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.32.1] - 2026-04-22
+
+### Bug Fixes
+
+- **TypeScript SDK build failure: duplicate method implementations**:
+  `submitOrder`, `unwatchOrderBook`, and `unwatchAddress` had hand-written
+  implementations that duplicated the auto-generated ones, causing TS2393.
+  Removed the hand-written duplicates and added `BuiltOrder` to the generator's
+  `SDK_PARAM_TYPES` so `submitOrder` gets the correct parameter type instead of
+  `any`.
+
 ## [2.32.0] - 2026-04-22
 
 ### New Features

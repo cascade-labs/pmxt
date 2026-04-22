@@ -68,6 +68,7 @@ const TYPE_MAP = {
 const SDK_PARAM_TYPES = new Set([
     'UnifiedMarket', 'UnifiedEvent', 'OrderBook', 'Order', 'Trade',
     'UserTrade', 'Position', 'Balance', 'PriceCandle', 'PaginatedMarketsResult',
+    'BuiltOrder',
 ]);
 
 // ---------------------------------------------------------------------------

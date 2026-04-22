@@ -736,7 +736,7 @@ export abstract class Exchange {
         }
     }
 
-    async submitOrder(built: any): Promise<Order> {
+    async submitOrder(built: BuiltOrder): Promise<Order> {
         await this.initPromise;
         try {
             const args: any[] = [];
@@ -1129,37 +1129,6 @@ export abstract class Exchange {
     }
 
     /**
-     * Unsubscribe from a previously watched order book stream.
-     *
-     * @param outcomeId - Outcome ID to stop watching
-     */
-    async unwatchOrderBook(outcomeId: string | MarketOutcome): Promise<void> {
-        await this.initPromise;
-        const resolvedOutcomeId = resolveOutcomeId(outcomeId);
-        try {
-            const args: any[] = [resolvedOutcomeId];
-
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/unwatchOrderBook`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
-            this.handleResponse(json);
-        } catch (error) {
-            if (error instanceof PmxtError) throw error;
-            throw new PmxtError(`Failed to unwatch order book: ${error}`);
-        }
-    }
-
-    /**
      * Watch real-time trade updates via WebSocket.
      * 
      * Returns a promise that resolves with the next trade(s).
@@ -1275,39 +1244,6 @@ export abstract class Exchange {
         }
     }
 
-    /**
-     * Stop watching a previously registered wallet address and release its resource updates.
-     *
-     * @param address - Public wallet to be watched
-     * @returns
-     */
-    async unwatchAddress(
-        address: string,
-    ): Promise<Trade[]> {
-        await this.initPromise;
-        try {
-            const args: any[] = [address];
-
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/unwatchAddress`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args, credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
-            return this.handleResponse(json);
-        } catch (error) {
-            if (error instanceof PmxtError) throw error;
-            throw new PmxtError(`Failed to unwatch address: ${error}`);
-        }
-    }
-
     // Trading Methods (require authentication)
 
     /**
@@ -1400,49 +1336,6 @@ export abstract class Exchange {
         } catch (error) {
             if (error instanceof PmxtError) throw error;
             throw new PmxtError(`Failed to build order: ${error}`);
-        }
-    }
-
-    /**
-     * Submit a pre-built order returned by {@link buildOrder}.
-     *
-     * @param built - The BuiltOrder payload from buildOrder()
-     * @returns The submitted order
-     *
-     * @example
-     * ```typescript
-     * const built = await exchange.buildOrder({
-     *   outcome: market.yes,
-     *   side: "buy",
-     *   type: "limit",
-     *   amount: 10,
-     *   price: 0.55
-     * });
-     * const order = await exchange.submitOrder(built);
-     * console.log(order.id, order.status);
-     * ```
-     */
-    async submitOrder(built: BuiltOrder): Promise<Order> {
-        await this.initPromise;
-        try {
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/submitOrder`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-                body: JSON.stringify({ args: [built as any], credentials: this.getCredentials() }),
-            });
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                if (body.error && typeof body.error === "object") {
-                    throw fromServerError(body.error);
-                }
-                throw new PmxtError(body.error?.message || response.statusText);
-            }
-            const json = await response.json();
-            const data = this.handleResponse(json);
-            return convertOrder(data);
-        } catch (error) {
-            if (error instanceof PmxtError) throw error;
-            throw new PmxtError(`Failed to submit order: ${error}`);
         }
     }
 
