@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.32.5] - 2026-04-22
+
+### Bug Fixes
+
+- **Router `fetchMatches` returns `undefined` for `bestBid`/`bestAsk`**: The
+  hosted API returns prices nested inside the match's `market` object, but
+  `MatchResult` exposes them at the top level. `fetchMatches` now maps them up
+  so callers get prices directly on the result without reaching into the market.
+
 ## [2.32.4] - 2026-04-22
 
 ### Bug Fixes
