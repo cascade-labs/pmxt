@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.32.3] - 2026-04-22
+
+### Bug Fixes
+
+- **Limitless `fetchOrderBook` rejects `outcomeId` from `fetchMarkets`**
+  ([#104](https://github.com/pmxt-dev/pmxt/issues/104)):
+  `fetchOrderBook` passed the id directly as a slug to the Limitless API. When
+  callers followed the standard PMXT pattern of passing `outcome.outcomeId`
+  (a CLOB token ID), the call failed with "Market not found". `fetchOrderBook`
+  now detects numeric CLOB token IDs and resolves them to the market slug via
+  the market cache before calling the API.
+
+- **Limitless `UnifiedMarket.slug` always `undefined`**: The `mapMarketToUnified`
+  helper omitted the `slug` field. It is now populated from the raw market slug.
+
+### New Features
+
+- **Router class** (`pmxt.Router`): A new cross-exchange aggregation layer
+  backed by the hosted PMXT API. Provides `fetchMatches`, `fetchEventMatches`,
+  `compareMarketPrices`, `fetchHedges`, `fetchArbitrage`, `fetchMarkets`, and
+  `fetchEvents`. Order routing is not yet implemented (`createOrder` throws).
+
 ## [2.32.2] - 2026-04-22
 
 ### Bug Fixes

@@ -170,8 +170,37 @@ export class LimitlessExchange extends PredictionMarketExchange {
     }
 
     async fetchOrderBook(id: string): Promise<OrderBook> {
-        const rawOrderBook = await this.fetcher.fetchRawOrderBook!(id);
-        return this.normalizer.normalizeOrderBook!(rawOrderBook as any, id);
+        // The Limitless API expects a market slug, but callers may pass an
+        // outcomeId (CLOB token ID) following the standard PMXT pattern.
+        // Resolve to slug if needed.
+        const slug = await this.resolveToSlug(id);
+        const rawOrderBook = await this.fetcher.fetchRawOrderBook!(slug);
+        return this.normalizer.normalizeOrderBook!(rawOrderBook as any, slug);
+    }
+
+    /**
+     * Resolve an id to a Limitless market slug. If the id is already a slug
+     * (contains non-digit chars), return it as-is. If it looks like a CLOB
+     * token ID (all digits, very long), scan cached markets to find the
+     * corresponding slug.
+     */
+    private async resolveToSlug(id: string): Promise<string> {
+        if (!/^\d+$/.test(id)) return id;
+
+        // Ensure market cache is populated
+        if (Object.keys(this.markets).length === 0) {
+            await this.loadMarkets();
+        }
+
+        for (const market of Object.values(this.markets)) {
+            for (const outcome of market.outcomes) {
+                if (outcome.outcomeId === id) {
+                    return market.marketId;
+                }
+            }
+        }
+
+        return id;
     }
 
     async fetchTrades(id: string, params: TradesParams | HistoryFilterParams): Promise<Trade[]> {

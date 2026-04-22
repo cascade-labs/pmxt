@@ -39,6 +39,7 @@ export function mapMarketToUnified(market: any): UnifiedMarket | null {
         eventId: market.slug,
         title: market.title || market.question,
         description: market.description,
+        slug: market.slug,
         outcomes: outcomes,
         resolutionDate: market.expirationTimestamp ? new Date(market.expirationTimestamp) : new Date(),
         volume24h: Number(market.volumeFormatted || 0),

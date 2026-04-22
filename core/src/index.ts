@@ -14,6 +14,7 @@ export * from './exchanges/opinion';
 export * from './exchanges/metaculus';
 export * from './exchanges/smarkets';
 export * from './exchanges/polymarket_us';
+export * from './router';
 export * from './server/app';
 export * from './server/utils/port-manager';
 export * from './server/utils/lock-file';
@@ -29,6 +30,7 @@ import { OpinionExchange } from './exchanges/opinion';
 import { MetaculusExchange } from './exchanges/metaculus';
 import { SmarketsExchange } from './exchanges/smarkets';
 import { PolymarketUSExchange } from './exchanges/polymarket_us';
+import { Router } from './router';
 
 const pmxt = {
     Polymarket: PolymarketExchange,
@@ -42,6 +44,7 @@ const pmxt = {
     Metaculus: MetaculusExchange,
     Smarkets: SmarketsExchange,
     PolymarketUS: PolymarketUSExchange,
+    Router,
 };
 
 export const Polymarket = PolymarketExchange;
