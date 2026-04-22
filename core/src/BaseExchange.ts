@@ -17,6 +17,15 @@ import {
 } from './types';
 import { ExecutionPriceResult, getExecutionPrice, getExecutionPriceDetailed } from './utils/math';
 import { Throttler } from './utils/throttler';
+import type {
+    FetchMatchesParams,
+    FetchEventMatchesParams,
+    FetchArbitrageParams,
+    MatchResult,
+    EventMatchResult,
+    PriceComparison,
+    ArbitrageOpportunity,
+} from './router/types';
 
 // ----------------------------------------------------------------------------
 // Implicit API Types (OpenAPI-driven method generation)
@@ -270,6 +279,16 @@ export interface ExchangeHas {
     buildOrder: ExchangeCapability;
     /** Whether this exchange supports submitting a pre-built order. */
     submitOrder: ExchangeCapability;
+    /** Whether this exchange supports fetching cross-venue market matches. */
+    fetchMatches: ExchangeCapability;
+    /** Whether this exchange supports fetching cross-venue event matches. */
+    fetchEventMatches: ExchangeCapability;
+    /** Whether this exchange supports comparing prices across venues. */
+    compareMarketPrices: ExchangeCapability;
+    /** Whether this exchange supports finding hedging opportunities across venues. */
+    fetchHedges: ExchangeCapability;
+    /** Whether this exchange supports scanning for arbitrage opportunities. */
+    fetchArbitrage: ExchangeCapability;
 }
 
 /**
@@ -1180,6 +1199,60 @@ export abstract class PredictionMarketExchange {
         // Exchanges with WebSocket support should override this
     }
 
+    // ----------------------------------------------------------------------------
+    // Matching Methods (Router-only; stubs throw for standard exchanges)
+    // ----------------------------------------------------------------------------
+
+    /**
+     * Fetch cross-venue matches for a given market.
+     *
+     * @param params - Match filter parameters (marketId, relation, minConfidence, etc.)
+     * @returns Array of matched markets with relation and confidence
+     */
+    async fetchMatches(params: FetchMatchesParams): Promise<MatchResult[]> {
+        throw new Error("Method fetchMatches not implemented.");
+    }
+
+    /**
+     * Fetch cross-venue matches for a given event.
+     *
+     * @param params - Event match filter parameters (eventId, relation, etc.)
+     * @returns Array of matched events with market-level match details
+     */
+    async fetchEventMatches(params: FetchEventMatchesParams): Promise<EventMatchResult[]> {
+        throw new Error("Method fetchEventMatches not implemented.");
+    }
+
+    /**
+     * Compare prices across venues for identity matches of a market.
+     *
+     * @param params - Match filter parameters (uses relation: 'identity' internally)
+     * @returns Array of price comparisons across venues
+     */
+    async compareMarketPrices(params: FetchMatchesParams): Promise<PriceComparison[]> {
+        throw new Error("Method compareMarketPrices not implemented.");
+    }
+
+    /**
+     * Find hedging opportunities via subset/superset matches across venues.
+     *
+     * @param params - Match filter parameters
+     * @returns Array of subset/superset matches with live prices
+     */
+    async fetchHedges(params: FetchMatchesParams): Promise<PriceComparison[]> {
+        throw new Error("Method fetchHedges not implemented.");
+    }
+
+    /**
+     * Scan for arbitrage opportunities across identity matches.
+     *
+     * @param params - Arbitrage scan parameters (minSpread, category, limit)
+     * @returns Array of arbitrage opportunities sorted by spread
+     */
+    async fetchArbitrage(params?: FetchArbitrageParams): Promise<ArbitrageOpportunity[]> {
+        throw new Error("Method fetchArbitrage not implemented.");
+    }
+
     /**
      * @internal
      * Implementation for fetching/searching markets.
@@ -1325,6 +1398,8 @@ export abstract class PredictionMarketExchange {
         'watchAddress', 'unwatchAddress', 'watchOrderBook',
         'unwatchOrderBook', 'watchTrades', 'fetchMyTrades',
         'fetchClosedOrders', 'fetchAllOrders', 'buildOrder', 'submitOrder',
+        'fetchMatches', 'fetchEventMatches', 'compareMarketPrices',
+        'fetchHedges', 'fetchArbitrage',
     ];
 
     // Compile-time exhaustiveness check: fails tsc if a key exists in
@@ -1337,6 +1412,8 @@ export abstract class PredictionMarketExchange {
         unwatchAddress: true, watchOrderBook: true, unwatchOrderBook: true,
         watchTrades: true, fetchMyTrades: true, fetchClosedOrders: true,
         fetchAllOrders: true, buildOrder: true, submitOrder: true,
+        fetchMatches: true, fetchEventMatches: true, compareMarketPrices: true,
+        fetchHedges: true, fetchArbitrage: true,
     };
 
     /**

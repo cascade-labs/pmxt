@@ -1,5 +1,11 @@
-import { PmxtApiClient } from './client';
+import {
+    PredictionMarketExchange,
+    type ExchangeCredentials,
+    type MarketFetchParams,
+    type EventFetchParams,
+} from '../BaseExchange';
 import type { UnifiedMarket, UnifiedEvent } from '../types';
+import { PmxtApiClient } from './client';
 import type {
     RouterOptions,
     MatchResult,
@@ -9,20 +15,48 @@ import type {
     FetchMatchesParams,
     FetchEventMatchesParams,
     FetchArbitrageParams,
-    RouterMarketSearchParams,
-    RouterEventSearchParams,
 } from './types';
 
-export class Router {
-    readonly name = 'Router';
+export class Router extends PredictionMarketExchange {
     private readonly client: PmxtApiClient;
 
     constructor(options: RouterOptions) {
+        super({ apiKey: options.apiKey } as ExchangeCredentials);
         this.client = new PmxtApiClient(options.apiKey, options.baseUrl);
+        this.rateLimit = 100;
+    }
+
+    get name(): string {
+        return 'Router';
     }
 
     // -----------------------------------------------------------------------
-    // Core: Cross-exchange market matches
+    // BaseExchange implementation delegates
+    // -----------------------------------------------------------------------
+
+    protected async fetchMarketsImpl(params?: MarketFetchParams): Promise<UnifiedMarket[]> {
+        const response = await this.client.searchMarkets({
+            query: params?.query,
+            category: params?.category,
+            limit: params?.limit,
+            offset: params?.offset,
+            closed: params?.status === 'closed' || params?.status === 'inactive',
+        });
+        return response ?? [];
+    }
+
+    protected async fetchEventsImpl(params?: EventFetchParams): Promise<UnifiedEvent[]> {
+        const response = await this.client.searchEvents({
+            query: params?.query,
+            category: params?.category,
+            limit: params?.limit,
+            offset: params?.offset,
+        });
+        return response ?? [];
+    }
+
+    // -----------------------------------------------------------------------
+    // Cross-exchange market matches
     // -----------------------------------------------------------------------
 
     async fetchMatches(params: FetchMatchesParams): Promise<MatchResult[]> {
@@ -116,7 +150,7 @@ export class Router {
             if (matches.length === 0) continue;
 
             const sourceAsk = market.outcomes[0]?.price ?? null;
-            const sourceBid = sourceAsk; // Best approximation from last price
+            const sourceBid = sourceAsk;
             const sourceVenue = (market as any).sourceExchange ?? '';
 
             for (const match of matches) {
@@ -158,27 +192,5 @@ export class Router {
 
         opportunities.sort((a, b) => b.spread - a.spread);
         return opportunities;
-    }
-
-    // -----------------------------------------------------------------------
-    // Cross-venue search
-    // -----------------------------------------------------------------------
-
-    async fetchMarkets(params?: RouterMarketSearchParams): Promise<UnifiedMarket[]> {
-        const response = await this.client.searchMarkets(params);
-        return response ?? [];
-    }
-
-    async fetchEvents(params?: RouterEventSearchParams): Promise<UnifiedEvent[]> {
-        const response = await this.client.searchEvents(params);
-        return response ?? [];
-    }
-
-    // -----------------------------------------------------------------------
-    // Disabled: order routing (future)
-    // -----------------------------------------------------------------------
-
-    async createOrder(): Promise<never> {
-        throw new Error('Router order routing is not yet implemented');
     }
 }

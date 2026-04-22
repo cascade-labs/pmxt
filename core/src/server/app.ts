@@ -13,6 +13,7 @@ import { OpinionExchange } from "../exchanges/opinion";
 import { MetaculusExchange } from "../exchanges/metaculus";
 import { SmarketsExchange } from "../exchanges/smarkets";
 import { PolymarketUSExchange } from "../exchanges/polymarket_us";
+import { Router } from "../router";
 import { ExchangeCredentials } from "../BaseExchange";
 import { BaseError } from "../errors";
 
@@ -502,6 +503,10 @@ function createExchange(name: string, credentials?: ExchangeCredentials) {
         apiKey: credentials?.apiKey || process.env.POLYMARKET_US_KEY_ID,
         privateKey:
           credentials?.privateKey || process.env.POLYMARKET_US_SECRET_KEY,
+      });
+    case "router":
+      return new Router({
+        apiKey: process.env.PMXT_API_KEY || '',
       });
     default:
       throw new Error(`Unknown exchange: ${name}`);

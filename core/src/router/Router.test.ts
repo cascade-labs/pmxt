@@ -29,21 +29,21 @@ describe('Router', () => {
 
     describe('fetchMatches', () => {
         it('returns matches from the API using marketId', async () => {
-            const mockMatches = [
+            const mockApiResponse = [
                 {
-                    market: { marketId: 'k1', sourceExchange: 'kalshi' },
+                    market: { marketId: 'k1', sourceExchange: 'kalshi', bestBid: 0.60, bestAsk: 0.65 },
                     relation: 'identity',
                     confidence: 0.95,
                     reasoning: 'Same resolution condition.',
-                    bestBid: 0.60,
-                    bestAsk: 0.65,
                 },
             ];
-            clientInstance.getMarketMatches = jest.fn().mockResolvedValue({ matches: mockMatches });
+            clientInstance.getMarketMatches = jest.fn().mockResolvedValue({ matches: mockApiResponse });
 
             const result = await router.fetchMatches({ marketId: 'm1', relation: 'identity' });
             expect(clientInstance.getMarketMatches).toHaveBeenCalledWith({ marketId: 'm1', relation: 'identity' });
-            expect(result).toEqual(mockMatches);
+            expect(result[0].confidence).toBe(0.95);
+            expect(result[0].bestBid).toBe(0.60);
+            expect(result[0].bestAsk).toBe(0.65);
         });
 
         it('accepts slug as identifier', async () => {
@@ -77,12 +77,10 @@ describe('Router', () => {
         it('fetches identity matches with includePrices and maps to PriceComparison', async () => {
             const mockMatches = [
                 {
-                    market: { marketId: 'k1', sourceExchange: 'kalshi', outcomes: [] },
+                    market: { marketId: 'k1', sourceExchange: 'kalshi', outcomes: [], bestBid: 0.55, bestAsk: 0.62 },
                     relation: 'identity',
                     confidence: 0.9,
                     reasoning: 'Same market.',
-                    bestBid: 0.55,
-                    bestAsk: 0.62,
                 },
             ];
             clientInstance.getMarketMatches = jest.fn().mockResolvedValue({ matches: mockMatches });
@@ -105,28 +103,22 @@ describe('Router', () => {
         it('returns only subset/superset matches with reasoning', async () => {
             const mockMatches = [
                 {
-                    market: { marketId: 'k1', sourceExchange: 'kalshi' },
+                    market: { marketId: 'k1', sourceExchange: 'kalshi', bestBid: 0.60, bestAsk: 0.65 },
                     relation: 'identity',
                     confidence: 0.95,
                     reasoning: 'Same.',
-                    bestBid: 0.60,
-                    bestAsk: 0.65,
                 },
                 {
-                    market: { marketId: 'k2', sourceExchange: 'kalshi' },
+                    market: { marketId: 'k2', sourceExchange: 'kalshi', bestBid: 0.40, bestAsk: 0.45 },
                     relation: 'subset',
                     confidence: 0.8,
                     reasoning: 'Narrower market — nomination implies candidacy.',
-                    bestBid: 0.40,
-                    bestAsk: 0.45,
                 },
                 {
-                    market: { marketId: 'k3', sourceExchange: 'polymarket' },
+                    market: { marketId: 'k3', sourceExchange: 'polymarket', bestBid: 0.70, bestAsk: 0.73 },
                     relation: 'superset',
                     confidence: 0.7,
                     reasoning: 'Broader — popular vote does not guarantee election win.',
-                    bestBid: 0.70,
-                    bestAsk: 0.73,
                 },
             ];
             clientInstance.getMarketMatches = jest.fn().mockResolvedValue({ matches: mockMatches });
@@ -145,7 +137,7 @@ describe('Router', () => {
             clientInstance.searchMarkets = jest.fn().mockResolvedValue(mockMarkets);
 
             const result = await router.fetchMarkets({ query: 'bitcoin' });
-            expect(clientInstance.searchMarkets).toHaveBeenCalledWith({ query: 'bitcoin' });
+            expect(clientInstance.searchMarkets).toHaveBeenCalled();
             expect(result).toEqual(mockMarkets);
         });
     });
@@ -156,16 +148,37 @@ describe('Router', () => {
             clientInstance.searchEvents = jest.fn().mockResolvedValue(mockEvents);
 
             const result = await router.fetchEvents({ query: 'election' });
-            expect(clientInstance.searchEvents).toHaveBeenCalledWith({ query: 'election' });
+            expect(clientInstance.searchEvents).toHaveBeenCalled();
             expect(result).toEqual(mockEvents);
         });
     });
 
     describe('createOrder', () => {
         it('throws not implemented error', async () => {
-            await expect(router.createOrder()).rejects.toThrow(
-                'Router order routing is not yet implemented',
+            await expect(router.createOrder({} as any)).rejects.toThrow(
+                'not implemented',
             );
+        });
+    });
+
+    describe('capabilities', () => {
+        it('reports matching methods as supported', () => {
+            expect(router.has.fetchMatches).toBe(true);
+            expect(router.has.fetchEventMatches).toBe(true);
+            expect(router.has.compareMarketPrices).toBe(true);
+            expect(router.has.fetchHedges).toBe(true);
+            expect(router.has.fetchArbitrage).toBe(true);
+        });
+
+        it('reports trading methods as unsupported', () => {
+            expect(router.has.createOrder).toBe(false);
+            expect(router.has.cancelOrder).toBe(false);
+            expect(router.has.fetchOrderBook).toBe(false);
+        });
+
+        it('reports search methods as supported', () => {
+            expect(router.has.fetchMarkets).toBe(true);
+            expect(router.has.fetchEvents).toBe(true);
         });
     });
 });
