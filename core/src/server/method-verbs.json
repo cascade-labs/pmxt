@@ -357,5 +357,55 @@
   "close": {
     "verb": "post",
     "args": []
+  },
+  "fetchMatches": {
+    "verb": "get",
+    "args": [
+      {
+        "name": "params",
+        "kind": "object",
+        "optional": false
+      }
+    ]
+  },
+  "fetchEventMatches": {
+    "verb": "get",
+    "args": [
+      {
+        "name": "params",
+        "kind": "object",
+        "optional": false
+      }
+    ]
+  },
+  "compareMarketPrices": {
+    "verb": "post",
+    "args": [
+      {
+        "name": "params",
+        "kind": "object",
+        "optional": false
+      }
+    ]
+  },
+  "fetchHedges": {
+    "verb": "get",
+    "args": [
+      {
+        "name": "params",
+        "kind": "object",
+        "optional": false
+      }
+    ]
+  },
+  "fetchArbitrage": {
+    "verb": "get",
+    "args": [
+      {
+        "name": "params",
+        "kind": "object",
+        "optional": true
+      }
+    ]
   }
 }

@@ -43,6 +43,7 @@ const VENUE_LABELS = {
     opinion: 'Opinion',
     metaculus: 'Metaculus',
     smarkets: 'Smarkets',
+    router: 'Router',
 };
 
 function extractVenues(spec) {
@@ -125,6 +126,13 @@ const ENDPOINT_GROUPS = [
         name: 'Markets & Events',
         match: (opId) =>
             /^(fetchMarkets|fetchMarketsPaginated|fetchEvents|fetchMarket|fetchEvent|filterMarkets|filterEvents)$/.test(
+                opId
+            ),
+    },
+    {
+        name: 'Matching',
+        match: (opId) =>
+            /^(fetchMatches|fetchEventMatches|compareMarketPrices|fetchHedges|fetchArbitrage)$/.test(
                 opId
             ),
     },

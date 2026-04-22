@@ -116,6 +116,17 @@
             ]
           },
           {
+            "group": "Matching",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "GET /api/{exchange}/fetchMatches",
+              "GET /api/{exchange}/fetchEventMatches",
+              "POST /api/{exchange}/compareMarketPrices",
+              "GET /api/{exchange}/fetchHedges",
+              "GET /api/{exchange}/fetchArbitrage"
+            ]
+          },
+          {
             "group": "Order Book & Trades",
             "openapi": "api-reference/openapi.json",
             "pages": [

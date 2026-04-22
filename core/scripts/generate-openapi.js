@@ -263,6 +263,11 @@ const PARAM_OVERRIDES = {
         { name: 'price', value: 0.55 },
         { name: 'amount', value: 10 },
     ],
+    fetchMatches: [{ name: 'marketId', value: '12345' }],
+    fetchEventMatches: [{ name: 'eventId', value: '12345' }],
+    compareMarketPrices: [{ name: 'marketId', value: '12345' }],
+    fetchHedges: [{ name: 'marketId', value: '12345' }],
+    fetchArbitrage: [{ name: 'minSpread', value: 0.05 }],
 };
 
 const FULL_OVERRIDES = {
@@ -432,17 +437,173 @@ function injectCodeSamples(spec) {
     return { ...spec, paths: newPaths };
 }
 
+// ---------------------------------------------------------------------------
+// Per-operation exchange scoping
+//
+// The capability system (exchange.has) knows exactly which exchanges
+// support which methods. We use this to:
+//   1. Replace the shared ExchangeParam $ref with an inline enum scoped
+//      to only the exchanges that actually implement the method.
+//   2. Filter x-codeSamples to only show applicable exchanges.
+//
+// This means fetchMatches only shows "Router" in the dropdown, while
+// createOrder excludes read-only exchanges like Router.
+// ---------------------------------------------------------------------------
+
+/**
+ * Instantiate every exchange from the built dist/ and return a map
+ * of { methodName: Set<wireKey> } indicating which exchanges support
+ * which methods.
+ */
+function buildCapabilityMap() {
+    let pmxt;
+    try {
+        pmxt = require(path.join(__dirname, '../dist'));
+    } catch (e) {
+        console.warn(
+            '[generate-openapi] dist/ not found — run `npm run build` first. ' +
+            'Skipping per-operation exchange scoping.'
+        );
+        return null;
+    }
+
+    const exchangeInstances = {
+        polymarket: new pmxt.Polymarket(),
+        kalshi: new pmxt.Kalshi(),
+        'kalshi-demo': new pmxt.KalshiDemo(),
+        limitless: new pmxt.Limitless(),
+        probable: new pmxt.Probable(),
+        baozi: new pmxt.Baozi(),
+        myriad: new pmxt.Myriad(),
+        opinion: new pmxt.Opinion(),
+        metaculus: new pmxt.Metaculus(),
+        smarkets: new pmxt.Smarkets(),
+        polymarket_us: new pmxt.PolymarketUS(),
+        router: new pmxt.Router({ apiKey: '_' }),
+    };
+
+    // Collect all capability keys from any exchange
+    const allMethods = new Set();
+    for (const ex of Object.values(exchangeInstances)) {
+        for (const key of Object.keys(ex.has)) {
+            allMethods.add(key);
+        }
+    }
+
+    // Build the map: method → [wireKeys that support it]
+    const capMap = {};
+    for (const method of allMethods) {
+        const supported = [];
+        for (const [wireKey, ex] of Object.entries(exchangeInstances)) {
+            if (ex.has[method]) supported.push(wireKey);
+        }
+        capMap[method] = supported;
+    }
+
+    return capMap;
+}
+
+/**
+ * Walk every operation in the spec and:
+ *   1. Replace $ref ExchangeParam with an inline param scoped to only
+ *      the exchanges that support this operationId.
+ *   2. Filter x-codeSamples to only show applicable exchanges.
+ *
+ * Returns a NEW spec object — the input is never mutated.
+ */
+function scopeExchangeParams(spec, capMap) {
+    if (!capMap) return spec;
+
+    const constructors = spec['x-sdk-constructors'] || {};
+    const paths = spec.paths || {};
+    const newPaths = {};
+
+    for (const [pathKey, methods] of Object.entries(paths)) {
+        const newMethods = {};
+        for (const [method, op] of Object.entries(methods)) {
+            if (!['get', 'post', 'put', 'delete', 'patch'].includes(method)) {
+                newMethods[method] = op;
+                continue;
+            }
+
+            const opId = op.operationId;
+            const supportedExchanges = capMap[opId];
+
+            if (!supportedExchanges || supportedExchanges.length === 0) {
+                // No capability data — keep the shared $ref as-is
+                newMethods[method] = op;
+                continue;
+            }
+
+            // Replace the ExchangeParam $ref with a scoped inline param
+            const newParams = (op.parameters || []).map((param) => {
+                if (param.$ref === '#/components/parameters/ExchangeParam') {
+                    return {
+                        in: 'path',
+                        name: 'exchange',
+                        schema: {
+                            type: 'string',
+                            enum: supportedExchanges,
+                        },
+                        required: true,
+                        description: 'The prediction market exchange to target.',
+                    };
+                }
+                return param;
+            });
+
+            // Filter code samples to only show supported exchanges
+            let codeSamples = op['x-codeSamples'];
+            if (Array.isArray(codeSamples)) {
+                const supportedClassNames = new Set(
+                    supportedExchanges
+                        .map((wireKey) => constructors[wireKey]?.className)
+                        .filter(Boolean)
+                );
+                codeSamples = codeSamples.filter(
+                    (sample) => supportedClassNames.has(sample.label)
+                );
+            }
+
+            newMethods[method] = {
+                ...op,
+                parameters: newParams,
+                ...(codeSamples ? { 'x-codeSamples': codeSamples } : {}),
+            };
+        }
+        newPaths[pathKey] = newMethods;
+    }
+
+    return { ...spec, paths: newPaths };
+}
+
 /**
  * Generate the hosted docs openapi.json from the sidecar spec.
- * Applies hosted rewrites, injects SDK code samples, writes JSON.
+ * Applies hosted rewrites, injects SDK code samples, scopes exchange
+ * params per-operation, writes JSON.
  */
 function generateHostedDocsSpec(spec) {
     const coreVersion = readCoreVersion();
     const rewritten = rewriteForHosted(spec, coreVersion);
     const withSamples = injectCodeSamples(rewritten);
 
+    // Scope exchange params per-operation using the capability system
+    const capMap = buildCapabilityMap();
+    const scoped = scopeExchangeParams(withSamples, capMap);
+    if (capMap) {
+        // Report scoping stats
+        const allExchanges = Object.keys(capMap.fetchMarkets || {}).length ||
+            Object.values(capMap)[0]?.length || 0;
+        const scopedOps = Object.entries(capMap)
+            .filter(([, exs]) => exs.length > 0 && exs.length < 12)
+            .length;
+        console.log(
+            `  Scoped ${scopedOps} operations to exchange subsets (capability-based)`
+        );
+    }
+
     fs.mkdirSync(path.dirname(DOCS_OPENAPI_OUT_PATH), { recursive: true });
-    const out = JSON.stringify(withSamples, null, 2) + '\n';
+    const out = JSON.stringify(scoped, null, 2) + '\n';
     fs.writeFileSync(DOCS_OPENAPI_OUT_PATH, out, 'utf-8');
 
     // Remove any stale YAML copy so Mintlify doesn't see two specs.
@@ -486,6 +647,14 @@ const TYPE_REF_MAP = {
   BuiltOrder: 'BuiltOrder',
   MarketFilterCriteria: 'MarketFilterCriteria',
   EventFilterCriteria: 'EventFilterCriteria',
+  FetchMatchesParams: 'FetchMatchesParams',
+  FetchEventMatchesParams: 'FetchEventMatchesParams',
+  FetchArbitrageParams: 'FetchArbitrageParams',
+  MatchResult: 'MatchResult',
+  EventMatchResult: 'EventMatchResult',
+  PriceComparison: 'PriceComparison',
+  ArbitrageOpportunity: 'ArbitrageOpportunity',
+  MatchRelation: 'MatchRelation',
 };
 
 // ---------------------------------------------------------------------------
@@ -1078,6 +1247,7 @@ const SOURCE_FILES = [
   path.join(__dirname, '../src/BaseExchange.ts'),
   path.join(__dirname, '../src/types.ts'),
   path.join(__dirname, '../src/utils/math.ts'),
+  path.join(__dirname, '../src/router/types.ts'),
 ];
 
 const STATIC_SCHEMAS = {
@@ -1141,6 +1311,14 @@ const GENERATED_SCHEMA_ORDER = [
   // Filtering criteria
   'MarketFilterCriteria',
   'EventFilterCriteria',
+  // Matching types (Router)
+  'FetchMatchesParams',
+  'FetchEventMatchesParams',
+  'FetchArbitrageParams',
+  'MatchResult',
+  'EventMatchResult',
+  'PriceComparison',
+  'ArbitrageOpportunity',
   // Auth
   'ExchangeCredentials',
 ];
@@ -1364,7 +1542,7 @@ function buildSpec(methodSpecs) {
           name: 'exchange',
           schema: {
             type: 'string',
-            enum: ['polymarket', 'kalshi', 'kalshi-demo', 'limitless', 'probable', 'baozi', 'myriad', 'opinion', 'metaculus', 'smarkets', 'polymarket_us'],
+            enum: ['polymarket', 'kalshi', 'kalshi-demo', 'limitless', 'probable', 'baozi', 'myriad', 'opinion', 'metaculus', 'smarkets', 'polymarket_us', 'router'],
           },
           required: true,
           description: 'The prediction market exchange to target.',

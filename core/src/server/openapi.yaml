@@ -1464,6 +1464,243 @@ paths:
       description: >-
         Close all WebSocket connections and clean up resources. Call this when you're done streaming to properly release
         connections.
+  '/api/{exchange}/fetchMatches':
+    get:
+      summary: Fetch Matches
+      operationId: fetchMatches
+      parameters:
+        - $ref: '#/components/parameters/ExchangeParam'
+        - in: query
+          name: marketId
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: slug
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: url
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: relation
+          required: false
+          schema:
+            $ref: '#/components/schemas/MatchRelation'
+        - in: query
+          name: minConfidence
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: includePrices
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Fetch Matches response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MatchResult'
+      description: Fetch cross-venue matches for a given market.
+  '/api/{exchange}/fetchEventMatches':
+    get:
+      summary: Fetch Event Matches
+      operationId: fetchEventMatches
+      parameters:
+        - $ref: '#/components/parameters/ExchangeParam'
+        - in: query
+          name: eventId
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: slug
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: relation
+          required: false
+          schema:
+            $ref: '#/components/schemas/MatchRelation'
+        - in: query
+          name: minConfidence
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: includePrices
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Fetch Event Matches response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EventMatchResult'
+      description: Fetch cross-venue matches for a given event.
+  '/api/{exchange}/compareMarketPrices':
+    post:
+      summary: Compare Market Prices
+      operationId: compareMarketPrices
+      parameters:
+        - $ref: '#/components/parameters/ExchangeParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: CompareMarketPricesRequest
+              type: object
+              properties:
+                args:
+                  type: array
+                  maxItems: 1
+                  items:
+                    $ref: '#/components/schemas/FetchMatchesParams'
+                  minItems: 1
+                credentials:
+                  $ref: '#/components/schemas/ExchangeCredentials'
+              required:
+                - args
+      responses:
+        '200':
+          description: Compare Market Prices response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PriceComparison'
+      description: Compare prices across venues for identity matches of a market.
+  '/api/{exchange}/fetchHedges':
+    get:
+      summary: Fetch Hedges
+      operationId: fetchHedges
+      parameters:
+        - $ref: '#/components/parameters/ExchangeParam'
+        - in: query
+          name: marketId
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: slug
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: url
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: relation
+          required: false
+          schema:
+            $ref: '#/components/schemas/MatchRelation'
+        - in: query
+          name: minConfidence
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: includePrices
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Fetch Hedges response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PriceComparison'
+      description: Find hedging opportunities via subset/superset matches across venues.
+  '/api/{exchange}/fetchArbitrage':
+    get:
+      summary: Fetch Arbitrage
+      operationId: fetchArbitrage
+      parameters:
+        - $ref: '#/components/parameters/ExchangeParam'
+        - in: query
+          name: minSpread
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: category
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Fetch Arbitrage response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ArbitrageOpportunity'
+      description: Scan for arbitrage opportunities across identity matches.
 components:
   parameters:
     ExchangeParam:
@@ -1483,6 +1720,7 @@ components:
           - metaculus
           - smarkets
           - polymarket_us
+          - router
       required: true
       description: The prediction market exchange to target.
   schemas:
@@ -2372,6 +2610,143 @@ components:
             max:
               type: number
           description: Sum of market volumes
+    FetchMatchesParams:
+      type: object
+      properties:
+        marketId:
+          type: string
+        slug:
+          type: string
+        url:
+          type: string
+        relation:
+          $ref: '#/components/schemas/MatchRelation'
+        minConfidence:
+          type: number
+        limit:
+          type: number
+        includePrices:
+          type: boolean
+    FetchEventMatchesParams:
+      type: object
+      properties:
+        eventId:
+          type: string
+        slug:
+          type: string
+        relation:
+          $ref: '#/components/schemas/MatchRelation'
+        minConfidence:
+          type: number
+        limit:
+          type: number
+        includePrices:
+          type: boolean
+    FetchArbitrageParams:
+      type: object
+      properties:
+        minSpread:
+          type: number
+        category:
+          type: string
+        limit:
+          type: number
+    MatchResult:
+      type: object
+      properties:
+        market:
+          $ref: '#/components/schemas/UnifiedMarket'
+        relation:
+          $ref: '#/components/schemas/MatchRelation'
+        confidence:
+          type: number
+        reasoning:
+          oneOf:
+            - type: string
+            - {}
+        bestBid:
+          oneOf:
+            - type: number
+            - {}
+        bestAsk:
+          oneOf:
+            - type: number
+            - {}
+      required:
+        - market
+        - relation
+        - confidence
+        - reasoning
+        - bestBid
+        - bestAsk
+    EventMatchResult:
+      type: object
+      properties:
+        event:
+          $ref: '#/components/schemas/UnifiedEvent'
+        marketMatches:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchResult'
+      required:
+        - event
+        - marketMatches
+    PriceComparison:
+      type: object
+      properties:
+        market:
+          $ref: '#/components/schemas/UnifiedMarket'
+        relation:
+          $ref: '#/components/schemas/MatchRelation'
+        confidence:
+          type: number
+        reasoning:
+          oneOf:
+            - type: string
+            - {}
+        bestBid:
+          oneOf:
+            - type: number
+            - {}
+        bestAsk:
+          oneOf:
+            - type: number
+            - {}
+        venue:
+          type: string
+      required:
+        - market
+        - relation
+        - confidence
+        - reasoning
+        - bestBid
+        - bestAsk
+        - venue
+    ArbitrageOpportunity:
+      type: object
+      properties:
+        marketA:
+          $ref: '#/components/schemas/UnifiedMarket'
+        marketB:
+          $ref: '#/components/schemas/UnifiedMarket'
+        spread:
+          type: number
+        buyVenue:
+          type: string
+        sellVenue:
+          type: string
+        buyPrice:
+          type: number
+        sellPrice:
+          type: number
+      required:
+        - marketA
+        - marketB
+        - spread
+        - buyVenue
+        - sellVenue
+        - buyPrice
+        - sellPrice
     ExchangeCredentials:
       type: object
       description: Optional authentication credentials for exchange operations.
@@ -2593,3 +2968,10 @@ x-sdk-constructors:
         tsName: privateKey
         type: string
         description: Private key for authentication
+  router:
+    className: Router
+    params:
+      - name: pmxt_api_key
+        tsName: pmxtApiKey
+        type: string
+        description: PMXT API key for hosted access
