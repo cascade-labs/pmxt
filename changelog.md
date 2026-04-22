@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.32.0] - 2026-04-22
+
+### New Features
+
+- **Polymarket `markets-by-token` endpoint**
+  ([#98](https://github.com/pmxt-dev/pmxt/issues/98),
+  [#101](https://github.com/pmxt-dev/pmxt/pull/101) — thanks @ndmeiri):
+  Added `GET /markets-by-token/{token_id}` to the Polymarket CLOB spec, returning
+  the condition ID and both token IDs for a given token. Available via
+  `callApi('getMarketsByToken', { token_id })` in both SDKs.
+
+- **New SDK methods: `unwatchOrderBook`, `unwatchAddress`, `submitOrder`**:
+  Previously missing from the generated SDK clients, these methods are now
+  available in both TypeScript and Python.
+
+- **`fetchPositions` / `fetchBalance` accept optional `address` param** (Python):
+  The Python SDK now matches the TypeScript SDK signature, allowing callers to
+  pass a wallet address directly.
+
+### Bug Fixes
+
+- **Python `markets_by_slug` never populated**
+  ([#102](https://github.com/pmxt-dev/pmxt/issues/102),
+  [#103](https://github.com/pmxt-dev/pmxt/pull/103) — thanks @ndmeiri):
+  `Exchange.markets_by_slug` was defined but never indexed during `load_markets`.
+  Markets are now keyed by slug alongside the existing `markets` dict.
+
+### SDK Regeneration
+
+- Regenerated both TypeScript and Python SDK clients from core. Notable internal
+  changes:
+  - All read methods now use direct POST calls instead of the `sidecarReadRequest`
+    helper (TS) / `_sidecar_read_request` helper (Python).
+  - Error handling simplified: `PmxtError` replaced with standard `Error` (TS);
+    `_parse_api_exception` replaced with `_extract_api_error` (Python).
+  - `fetchOrderBook` signature narrowed from `string | MarketOutcome` to `string`
+    in both SDKs.
+
 ## [2.31.4] - 2026-04-21
 
 ### Bug Fixes
