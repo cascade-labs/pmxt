@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.33.5] - 2026-04-23
+
+### Bug Fixes
+
+- **Kalshi volume/open_interest always zero**: The Kalshi normalizer only
+  read legacy integer fields (`volume`, `volume_24h`, `open_interest`)
+  which Kalshi no longer populates. Now parses the fixed-point string
+  fields (`volume_fp`, `volume_24h_fp`, `open_interest_fp`) that Kalshi
+  actually returns, falling back to the legacy fields for backwards
+  compatibility. This was causing ~98% of Kalshi events to be skipped by
+  volume-based filters downstream (e.g. the hosted-pmxt matching pipeline
+  embedded only 231 of 16,357 Kalshi events).
+
 ## [2.33.4] - 2026-04-23
 
 ### Improvements

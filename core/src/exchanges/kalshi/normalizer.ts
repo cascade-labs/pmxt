@@ -75,10 +75,10 @@ export class KalshiNormalizer implements IExchangeNormalizer<KalshiRawEvent, Kal
             description: market.rules_primary || market.rules_secondary || '',
             outcomes,
             resolutionDate: new Date(market.expiration_time),
-            volume24h: Number(market.volume_24h || market.volume || 0),
-            volume: Number(market.volume || 0),
+            volume24h: parseFloat(market.volume_24h_fp ?? '') || Number(market.volume_24h || market.volume || 0),
+            volume: parseFloat(market.volume_fp ?? '') || Number(market.volume || 0),
             liquidity: Number(market.liquidity || 0),
-            openInterest: Number(market.open_interest || 0),
+            openInterest: parseFloat(market.open_interest_fp ?? '') || Number(market.open_interest || 0),
             url: `https://kalshi.com/events/${event.event_ticker}`,
             category: event.category,
             tags: unifiedTags,
@@ -347,11 +347,11 @@ export class KalshiNormalizer implements IExchangeNormalizer<KalshiRawEvent, Kal
 // -- Event sorting utility (exported for fetchEvents) -------------------------
 
 function eventVolume(event: any): number {
-    return (event.markets || []).reduce((sum: number, m: any) => sum + Number(m.volume || 0), 0);
+    return (event.markets || []).reduce((sum: number, m: any) => sum + (parseFloat(m.volume_fp ?? '') || Number(m.volume || 0)), 0);
 }
 
 function eventLiquidity(event: any): number {
-    return (event.markets || []).reduce((sum: number, m: any) => sum + Number(m.open_interest || m.liquidity || 0), 0);
+    return (event.markets || []).reduce((sum: number, m: any) => sum + (parseFloat(m.open_interest_fp ?? '') || Number(m.open_interest || m.liquidity || 0)), 0);
 }
 
 function eventNewest(event: any): number {
