@@ -1,0 +1,105 @@
+---
+title: Find Similar Markets
+description: "Find the same or related market on other venues, with relation types, confidence scores, and reasoning."
+---
+
+Given a market on any venue, find semantically equivalent or related
+markets on every other venue PMXT ingests. Each match comes with a
+relation type, confidence score, and reasoning.
+
+## fetchMatches
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import pmxt
+
+    router = pmxt.Router(pmxt_api_key="pmxt_live_...")
+
+    matches = router.fetch_matches(market_id="d35bc8c6-...", min_confidence=0.8)
+
+    for m in matches:
+        print(m.relation, m.confidence, m.market.title)
+        print(f"  best bid: {m.best_bid}  best ask: {m.best_ask}")
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    import pmxt from "pmxtjs";
+
+    const router = new pmxt.Router({ pmxtApiKey: "pmxt_live_..." });
+
+    const matches = await router.fetchMatches({
+      marketId: "d35bc8c6-...",
+      minConfidence: 0.8,
+    });
+
+    for (const m of matches) {
+      console.log(m.relation, m.confidence, m.market.title);
+      console.log(`  best bid: ${m.bestBid}  best ask: ${m.bestAsk}`);
+    }
+    ```
+  </Tab>
+  <Tab title="curl">
+    ```bash
+    curl "https://api.pmxt.dev/v0/markets/d35bc8c6-.../matches?minConfidence=0.8" \
+      -H "Authorization: Bearer pmxt_live_..."
+    ```
+  </Tab>
+</Tabs>
+
+### Parameters
+
+| Parameter       | Type      | Default | Notes                                                         |
+| --------------- | --------- | ------- | ------------------------------------------------------------- |
+| `marketId`      | `string`  | —       | Internal PMXT market ID.                                      |
+| `slug`          | `string`  | —       | Market slug (alternative to `marketId`).                      |
+| `url`           | `string`  | —       | Market URL on the source venue (alternative to `marketId`).   |
+| `relation`      | `string`  | —       | Filter to a specific relation type (see below).               |
+| `minConfidence` | `number`  | —       | Only return matches above this threshold (0–1).               |
+| `limit`         | `integer` | —       | Max matches to return.                                        |
+| `includePrices` | `boolean` | `false` | Attach live `bestBid` / `bestAsk` to each match.             |
+
+Provide one of `marketId`, `slug`, or `url`. The Router resolves the
+market and searches every other venue for matches.
+
+### Response shape
+
+```json
+{
+  "market": { "marketId": "...", "title": "...", "outcomes": [...] },
+  "relation": "identity",
+  "confidence": 0.95,
+  "reasoning": "Same resolution condition: will BTC exceed $100k by Dec 31.",
+  "bestBid": 0.60,
+  "bestAsk": 0.65
+}
+```
+
+## Relation types
+
+Every match is classified into one of five set-theoretic relations
+describing how two markets' resolution conditions relate:
+
+| Relation      | Meaning                                            | Example                                                                  |
+| ------------- | -------------------------------------------------- | ------------------------------------------------------------------------ |
+| **identity**  | Same resolution condition.                         | "BTC > $100k by Dec 31" on Polymarket and Kalshi.                        |
+| **subset**    | A resolving YES implies B resolves YES, not vice versa. | "Democrats win presidency" (A) ⊂ "Democrats win popular vote" (B).  |
+| **superset**  | B resolving YES implies A resolves YES, not vice versa. | "Anyone wins popular vote" (A) ⊃ "Democrats win popular vote" (B).  |
+| **overlap**   | Related, but neither implies the other.            | "Fed cuts in June" vs "Fed cuts in 2025" — June is a subset of 2025, but a cut in September would satisfy B without A. |
+| **disjoint**  | Cannot both resolve YES.                           | "Democrats win" vs "Republicans win" the same election.                  |
+
+Filter to a specific relation with the `relation` parameter:
+
+```python
+# Only identity matches (same market, different venue)
+matches = router.fetch_matches(market_id="...", relation="identity")
+
+# Only subset/superset (useful for hedging — see fetchHedges)
+matches = router.fetch_matches(market_id="...", relation="subset")
+```
+
+<Info>
+  To match an entire event and all its child markets at once, see
+  [Find Similar Events](/router/event-matching).
+</Info>

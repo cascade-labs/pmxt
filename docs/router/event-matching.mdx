@@ -1,0 +1,109 @@
+---
+title: Find Similar Events
+description: "Match an entire event across venues — all child markets mapped in a single call."
+---
+
+Given an event on any venue, find the corresponding event on every
+other venue and map all child markets across them. Instead of matching
+one market at a time, this returns the full cross-venue mapping in a
+single call.
+
+An [Event](/concepts/unified-schema) is the parent container — it holds
+multiple Markets, each with their own Outcomes. Event matching maps the
+entire tree across venues.
+
+## fetchEventMatches
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import pmxt
+
+    router = pmxt.Router(pmxt_api_key="pmxt_live_...")
+
+    event_matches = router.fetch_event_matches(event_id="e344d660-...")
+
+    for em in event_matches:
+        print(em.event.title)
+        for mm in em.market_matches:
+            print(f"  {mm.relation} ({mm.confidence}): {mm.market.title}")
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    import pmxt from "pmxtjs";
+
+    const router = new pmxt.Router({ pmxtApiKey: "pmxt_live_..." });
+
+    const eventMatches = await router.fetchEventMatches({
+      eventId: "e344d660-...",
+    });
+
+    for (const em of eventMatches) {
+      console.log(em.event.title);
+      for (const mm of em.marketMatches) {
+        console.log(`  ${mm.relation} (${mm.confidence}): ${mm.market.title}`);
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="curl">
+    ```bash
+    curl "https://api.pmxt.dev/v0/events/e344d660-.../matches" \
+      -H "Authorization: Bearer pmxt_live_..."
+    ```
+  </Tab>
+</Tabs>
+
+### Parameters
+
+| Parameter       | Type      | Default | Notes                                             |
+| --------------- | --------- | ------- | ------------------------------------------------- |
+| `eventId`       | `string`  | —       | Internal PMXT event ID.                           |
+| `slug`          | `string`  | —       | Event slug (alternative to `eventId`).            |
+| `relation`      | `string`  | —       | Filter market matches to a specific [relation type](/router/matching#relation-types). |
+| `minConfidence` | `number`  | —       | Only return matches above this threshold (0–1).   |
+| `limit`         | `integer` | —       | Max event matches to return.                      |
+| `includePrices` | `boolean` | `false` | Attach live prices to each market match.          |
+
+### Response shape
+
+```json
+[
+  {
+    "event": {
+      "eventId": "...",
+      "title": "2028 US Presidential Election"
+    },
+    "marketMatches": [
+      {
+        "market": { "marketId": "...", "title": "Will Newsom win?" },
+        "relation": "identity",
+        "confidence": 0.92,
+        "reasoning": "Same candidate, same office, same election cycle."
+      },
+      {
+        "market": { "marketId": "...", "title": "Will DeSantis win?" },
+        "relation": "identity",
+        "confidence": 0.89,
+        "reasoning": "Same candidate — different bracket formatting on Kalshi."
+      }
+    ]
+  }
+]
+```
+
+Each matched event contains its full list of cross-venue market matches.
+Markets that exist on one venue but not the other are omitted from the
+response — only matched pairs appear.
+
+### When to use event matching vs market matching
+
+| You have…                | Use                                        |
+| ------------------------ | ------------------------------------------ |
+| A single market question | [Find Similar Markets](/router/matching)   |
+| An event with many child markets | **Find Similar Events** (this page) |
+
+Event matching is more efficient when you care about the full picture —
+it maps all child markets in one call instead of N separate market
+match calls.

@@ -1,0 +1,213 @@
+---
+title: Compare Prices & Arbitrage
+description: "Compare prices across venues, find hedges, and scan for arbitrage."
+---
+
+Three methods build on [matching](/router/matching) to answer pricing
+questions across venues.
+
+## compareMarketPrices
+
+Side-by-side bid/ask for the same market on every venue.
+
+Under the hood this calls `fetchMatches` with `relation: "identity"`
+and `includePrices: true`, then maps the results to a flat comparison.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import pmxt
+
+    router = pmxt.Router(pmxt_api_key="pmxt_live_...")
+
+    prices = router.compare_market_prices(market_id="d35bc8c6-...")
+
+    for p in prices:
+        print(f"{p.venue:12s}  bid {p.best_bid:.2f}  ask {p.best_ask:.2f}")
+    ```
+
+    ```
+    polymarket    bid 0.60  ask 0.65
+    kalshi        bid 0.58  ask 0.63
+    limitless     bid 0.61  ask 0.66
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    import pmxt from "pmxtjs";
+
+    const router = new pmxt.Router({ pmxtApiKey: "pmxt_live_..." });
+
+    const prices = await router.compareMarketPrices({
+      marketId: "d35bc8c6-...",
+    });
+
+    for (const p of prices) {
+      console.log(`${p.venue.padEnd(12)}  bid ${p.bestBid}  ask ${p.bestAsk}`);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response shape
+
+```json
+{
+  "market": { "marketId": "...", "title": "..." },
+  "relation": "identity",
+  "confidence": 0.95,
+  "reasoning": "Same resolution condition.",
+  "bestBid": 0.60,
+  "bestAsk": 0.65,
+  "venue": "kalshi"
+}
+```
+
+## fetchHedges
+
+Find markets that partially hedge a position — markets whose resolution
+condition is a subset or superset of the target market.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    hedges = router.fetch_hedges(market_id="d35bc8c6-...")
+
+    for h in hedges:
+        print(f"{h.relation:10s} {h.venue:12s}  {h.market.title}")
+        print(f"           confidence {h.confidence:.0%}  bid {h.best_bid}  ask {h.best_ask}")
+        print(f"           {h.reasoning}")
+    ```
+
+    ```
+    subset     kalshi        Will the nominee be from California?
+               confidence 85%  bid 0.40  ask 0.45
+               Narrower market — California origin implies Democratic candidacy.
+    superset   polymarket    Will a Democrat win the popular vote?
+               confidence 72%  bid 0.70  ask 0.73
+               Broader — popular vote does not guarantee election win.
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const hedges = await router.fetchHedges({ marketId: "d35bc8c6-..." });
+
+    for (const h of hedges) {
+      console.log(h.relation, h.venue, h.market.title);
+      console.log(`  confidence: ${h.confidence}  reasoning: ${h.reasoning}`);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+Subset means A=YES implies B=YES but not vice versa. Superset is the
+reverse. See [relation types](/router/matching#relation-types) for the
+full taxonomy.
+
+<Info>
+  `fetchHedges` filters matches to `subset` and `superset` relations
+  only. If you want all relations, use
+  [`fetchMatches`](/router/matching#fetchmatches) directly.
+</Info>
+
+## fetchArbitrage
+
+Scan for cross-venue price spreads on identity-matched markets.
+
+The Router fetches markets, finds identity matches on other venues,
+compares bid/ask, and returns every pair where you could theoretically
+buy on one venue and sell on another for a positive spread.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    opps = router.fetch_arbitrage(min_spread=0.03, category="Politics", limit=20)
+
+    for o in opps:
+        print(f"spread {o.spread:+.2f}")
+        print(f"  buy  {o.buy_venue:12s} @ {o.buy_price:.2f}  ({o.market_a.title})")
+        print(f"  sell {o.sell_venue:12s} @ {o.sell_price:.2f}  ({o.market_b.title})")
+    ```
+
+    ```
+    spread +0.05
+      buy  polymarket   @ 0.58  (Will BTC hit $100k by Dec 31?)
+      sell kalshi       @ 0.63  (Bitcoin above $100k on Dec 31)
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const opps = await router.fetchArbitrage({
+      minSpread: 0.03,
+      category: "Politics",
+      limit: 20,
+    });
+
+    for (const o of opps) {
+      console.log(`spread: +${o.spread.toFixed(2)}`);
+      console.log(`  buy  ${o.buyVenue} @ ${o.buyPrice}  (${o.marketA.title})`);
+      console.log(`  sell ${o.sellVenue} @ ${o.sellPrice}  (${o.marketB.title})`);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Parameters
+
+| Parameter   | Type      | Default | Notes                                                  |
+| ----------- | --------- | ------- | ------------------------------------------------------ |
+| `minSpread` | `number`  | `0`     | Only return pairs with spread ≥ this value.            |
+| `category`  | `string`  | —       | Filter source markets by category.                     |
+| `limit`     | `integer` | `50`    | Max source markets to scan for matches.                |
+
+Results are sorted by spread descending — the biggest opportunities
+first.
+
+### Response shape
+
+```json
+{
+  "marketA": { "marketId": "...", "title": "..." },
+  "marketB": { "marketId": "...", "title": "..." },
+  "spread": 0.05,
+  "buyVenue": "polymarket",
+  "sellVenue": "kalshi",
+  "buyPrice": 0.58,
+  "sellPrice": 0.63
+}
+```
+
+<Warning>
+  Arbitrage detection shows price discrepancies — it does not execute
+  trades. Order routing is not yet available. Use venue-specific
+  exchanges (`pmxt.Polymarket(...)`, `pmxt.Kalshi(...)`) to place
+  orders on each side.
+</Warning>
+
+## Composing with venue exchanges
+
+The Router is read-only — it finds opportunities, but you trade on
+venue exchanges. A typical workflow:
+
+```python
+import pmxt
+
+router = pmxt.Router(pmxt_api_key="pmxt_live_...")
+poly   = pmxt.Polymarket(pmxt_api_key="pmxt_live_...", private_key="0x...")
+kalshi = pmxt.Kalshi(pmxt_api_key="pmxt_live_...", api_key="...", private_key="...")
+
+# 1. Discover an arbitrage opportunity
+opps = router.fetch_arbitrage(min_spread=0.03)
+
+# 2. Inspect order books on each venue
+book_a = poly.fetch_order_book(market_id=opps[0].market_a.market_id)
+book_b = kalshi.fetch_order_book(market_id=opps[0].market_b.market_id)
+
+# 3. Execute on each venue (requires venue credentials)
+# poly.create_order(...)
+# kalshi.create_order(...)
+```
+
+Router returns the same [unified schema](/concepts/unified-schema) as
+every other exchange, so `marketId`, `outcomes`, and all other fields
+work interchangeably.

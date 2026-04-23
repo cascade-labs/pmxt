@@ -36,22 +36,53 @@ for m in markets:
 Swap the venue class — `pmxt.Kalshi(...)`, `pmxt.Limitless(...)` — and
 the methods and response shapes stay the same.
 
-## What you get
+## The Router — cross-venue intelligence
+
+The **[Router](/router/overview)** is PMXT's cross-venue intelligence
+layer. Search, match, compare prices, find hedges, and detect arbitrage
+across every venue — all from a single PMXT API key:
+
+```python
+router = pmxt.Router(pmxt_api_key="pmxt_live_...")
+
+# Search every venue at once
+markets = router.fetch_markets(query="fed rate cut")
+
+# Find this market on other venues with confidence scores
+matches = router.fetch_matches(market_id=markets[0].market_id)
+
+# Scan for cross-venue price spreads
+arb = router.fetch_arbitrage(min_spread=0.03)
+```
 
 <CardGroup cols={2}>
-  <Card title="Unified interface for every venue" icon="layer-group" href="/concepts/unified-schema">
-    Same methods, same response shape, every venue. `fetch_markets`,
-    `create_order`, `fetch_positions` work identically whether you're on
-    Polymarket or Kalshi.
-  </Card>
   <Card title="Cross-venue search" icon="magnifying-glass" href="/router/events">
-    The Router searches every venue in a single query and returns ranked,
-    unified results — the foundation for a smart order router for
-    prediction markets.
+    One query fans out across every venue. Results in ~10ms from a
+    shared catalog.
   </Card>
-  <Card title="Fast reads from a shared catalog" icon="bolt" href="/concepts/catalog-vs-live">
-    PMXT continuously ingests every venue into a Postgres catalog. Reads
-    hit an index instead of fanning out across 11 different APIs.
+  <Card title="Market matching" icon="link" href="/router/matching">
+    Find the same or related market on other venues with relation
+    types, confidence, and reasoning.
+  </Card>
+  <Card title="Prices & arbitrage" icon="scale-balanced" href="/router/prices">
+    Compare bid/ask across venues, discover hedges, and scan for
+    cross-venue spreads.
+  </Card>
+  <Card title="Compose with venues" icon="puzzle-piece" href="/router/prices#composing-with-venue-exchanges">
+    Discover with the Router, trade on venue exchanges. Same schema,
+    same `marketId`.
+  </Card>
+</CardGroup>
+
+## Unified venue interface
+
+Same methods, same response shape, every venue. `fetch_markets`,
+`create_order`, `fetch_positions` work identically whether you're on
+Polymarket or Kalshi.
+
+<CardGroup cols={2}>
+  <Card title="Unified schema" icon="layer-group" href="/concepts/unified-schema">
+    `Event` / `Market` / `Outcome` — the shape that works everywhere.
   </Card>
   <Card title="Same SDK, local or hosted" icon="code" href="/quickstart">
     The `pmxt` (Python) and `pmxtjs` (TypeScript) SDKs work identically

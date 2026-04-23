@@ -74,12 +74,31 @@
             "pages": [
               "sdk/server"
             ]
+          }
+        ]
+      },
+      {
+        "tab": "Router",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "router/overview"
+            ]
           },
           {
-            "group": "Router",
+            "group": "Search",
             "pages": [
               "router/events",
               "router/markets"
+            ]
+          },
+          {
+            "group": "Analyze",
+            "pages": [
+              "router/event-matching",
+              "router/matching",
+              "router/prices"
             ]
           }
         ]
@@ -110,9 +129,7 @@
               "GET /api/{exchange}/fetchMarketsPaginated",
               "GET /api/{exchange}/fetchEvents",
               "GET /api/{exchange}/fetchMarket",
-              "GET /api/{exchange}/fetchEvent",
-              "POST /api/{exchange}/filterMarkets",
-              "POST /api/{exchange}/filterEvents"
+              "GET /api/{exchange}/fetchEvent"
             ]
           },
           {

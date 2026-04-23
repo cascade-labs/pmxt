@@ -82,10 +82,12 @@ Polymarket, Kalshi, Limitless, or anywhere else. Filter by venue with
 `&exchange=kalshi`, by category with `&category=Politics`, or just
 search everything.
 
-<Note>
-  Router support is coming to the Python and TypeScript SDKs. Today, the
-  `/v0/events` and `/v0/markets` endpoints are available via HTTP.
-</Note>
+<Info>
+  The Router is also available as an SDK class — `pmxt.Router(...)` in
+  Python and `new pmxt.Router(...)` in TypeScript. Beyond search, it
+  supports [cross-venue matching](/router/matching) and
+  [arbitrage detection](/router/prices).
+</Info>
 
 ## 4. Go further
 
