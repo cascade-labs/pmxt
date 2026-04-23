@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.33.3] - 2026-04-23
+
+### Bug Fixes
+
+- **Router ignores user's API key**: The server-side Router was
+  hardcoded to `process.env.PMXT_API_KEY` instead of using the caller's
+  Bearer token. Every Router request returned "missing api key" unless
+  the server had the env var set. Now extracts the API key from the
+  request's `Authorization: Bearer` header — exactly what the user
+  passes.
+
 ## [2.33.2] - 2026-04-23
 
 ### Bug Fixes

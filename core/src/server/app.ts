@@ -271,7 +271,14 @@ export function createApp(options: CreateAppOptions = {}): Express {
       const exchangeName = (req.params.exchange as string).toLowerCase();
 
       let exchange: any;
-      if (
+      if (exchangeName === "router") {
+        // Router uses the caller's Bearer token for its internal /v0/
+        // calls — not a server-side env var.  Each request may carry a
+        // different key, so Router is never cached as a singleton.
+        const bearer =
+          req.headers.authorization?.replace(/^Bearer\s+/i, "") || "";
+        exchange = createExchange(exchangeName, undefined, bearer);
+      } else if (
         credentials &&
         (credentials.privateKey ||
           credentials.apiKey ||
@@ -416,7 +423,7 @@ export async function startServer(port: number, accessToken: string) {
   return app.listen(port, "127.0.0.1");
 }
 
-function createExchange(name: string, credentials?: ExchangeCredentials) {
+function createExchange(name: string, credentials?: ExchangeCredentials, bearerToken?: string) {
   switch (name) {
     case "polymarket":
       return new PolymarketExchange({
@@ -506,7 +513,7 @@ function createExchange(name: string, credentials?: ExchangeCredentials) {
       });
     case "router":
       return new Router({
-        apiKey: process.env.PMXT_API_KEY || '',
+        apiKey: bearerToken!,
       });
     default:
       throw new Error(`Unknown exchange: ${name}`);
