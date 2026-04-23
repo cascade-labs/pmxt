@@ -123,18 +123,20 @@ const ENDPOINT_GROUPS = [
         match: (opId) => ['healthCheck', 'loadMarkets', 'close'].includes(opId),
     },
     {
-        name: 'Markets & Events',
+        name: 'Events & Markets',
         match: (opId) =>
-            /^(fetchMarkets|fetchMarketsPaginated|fetchEvents|fetchMarket|fetchEvent|filterMarkets|filterEvents)$/.test(
+            /^(fetchEvents|fetchEvent|fetchMarkets|fetchMarketsPaginated|fetchMarket)$/.test(
                 opId
             ),
+        order: ['fetchEvents', 'fetchEvent', 'fetchMarkets', 'fetchMarketsPaginated', 'fetchMarket'],
     },
     {
-        name: 'Matching',
+        name: 'Cross-Venue',
         match: (opId) =>
-            /^(fetchMatches|fetchEventMatches|compareMarketPrices|fetchHedges|fetchArbitrage)$/.test(
+            /^(fetchEventMatches|fetchMatches|compareMarketPrices|fetchHedges|fetchArbitrage)$/.test(
                 opId
             ),
+        order: ['fetchEventMatches', 'fetchMatches', 'compareMarketPrices', 'fetchHedges', 'fetchArbitrage'],
     },
     {
         name: 'Order Book & Trades',
@@ -163,6 +165,11 @@ const ENDPOINT_GROUPS = [
     },
 ];
 
+// Operations that exist in the OpenAPI spec but should not appear in the docs
+// sidebar (e.g. SDK-only helpers that are exposed as routes but aren't meant
+// to be called directly by API consumers).
+const HIDDEN_OPERATIONS = new Set(['filterMarkets', 'filterEvents']);
+
 function buildEndpointGroups(spec) {
     const buckets = new Map();
     for (const group of ENDPOINT_GROUPS) buckets.set(group.name, []);
@@ -174,6 +181,7 @@ function buildEndpointGroups(spec) {
                 continue;
             }
             const opId = op.operationId || '';
+            if (HIDDEN_OPERATIONS.has(opId)) continue;
             const ref = `${method.toUpperCase()} ${pathKey}`;
 
             let placed = false;
@@ -191,10 +199,20 @@ function buildEndpointGroups(spec) {
     const groups = [];
     for (const [name, refs] of buckets.entries()) {
         if (refs.length === 0) continue;
+        const groupDef = ENDPOINT_GROUPS.find((g) => g.name === name);
+        const sorted = groupDef?.order
+            ? refs.sort((a, b) => {
+                  const opA = ENDPOINT_GROUPS.length && a.split('/').pop();
+                  const opB = ENDPOINT_GROUPS.length && b.split('/').pop();
+                  const idxA = groupDef.order.indexOf(opA);
+                  const idxB = groupDef.order.indexOf(opB);
+                  return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+              })
+            : refs;
         groups.push({
             group: name,
             openapi: 'api-reference/openapi.json',
-            pages: refs,
+            pages: sorted,
         });
     }
     return groups;

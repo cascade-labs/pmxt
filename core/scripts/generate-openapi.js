@@ -828,9 +828,19 @@ function typeNodeToSchema(node, sourceFile) {
 // Helpers
 // ---------------------------------------------------------------------------
 
+const SUMMARY_OVERRIDES = {
+  fetchMatches: 'Find Similar Markets',
+  fetchEventMatches: 'Find Similar Events',
+  compareMarketPrices: 'Compare Prices Across Venues',
+  fetchHedges: 'Find Hedging Opportunities',
+  fetchArbitrage: 'Find Arbitrage Opportunities',
+};
+
 function camelToTitle(name) {
+  if (SUMMARY_OVERRIDES[name]) return SUMMARY_OVERRIDES[name];
   return name
-    .replace(/([A-Z])/g, ' $1')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/^./, s => s.toUpperCase())
     .trim();
 }

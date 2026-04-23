@@ -1204,7 +1204,7 @@ export abstract class PredictionMarketExchange {
     // ----------------------------------------------------------------------------
 
     /**
-     * Fetch cross-venue matches for a given market.
+     * Find the same or related market on other venues. Given a market on one venue, discover semantically equivalent markets across every other venue PMXT ingests — each with a relation type (identity, subset, superset, overlap, disjoint), confidence score, and reasoning.
      *
      * @param params - Match filter parameters (marketId, relation, minConfidence, etc.)
      * @returns Array of matched markets with relation and confidence
@@ -1214,7 +1214,7 @@ export abstract class PredictionMarketExchange {
     }
 
     /**
-     * Fetch cross-venue matches for a given event.
+     * Find the same or related event on other venues. Given an event on one venue, discover semantically equivalent events across every other venue PMXT ingests — including market-level match details for each child market.
      *
      * @param params - Event match filter parameters (eventId, relation, etc.)
      * @returns Array of matched events with market-level match details
@@ -1224,7 +1224,7 @@ export abstract class PredictionMarketExchange {
     }
 
     /**
-     * Compare prices across venues for identity matches of a market.
+     * Compare live prices for the same market across venues. Finds identity matches and returns side-by-side best bid/ask prices so you can spot price differences at a glance.
      *
      * @param params - Match filter parameters (uses relation: 'identity' internally)
      * @returns Array of price comparisons across venues
@@ -1234,7 +1234,7 @@ export abstract class PredictionMarketExchange {
     }
 
     /**
-     * Find hedging opportunities via subset/superset matches across venues.
+     * Find hedging opportunities across venues. Discovers subset/superset market relationships where one market's outcome implies another, enabling cross-venue hedging strategies with live prices.
      *
      * @param params - Match filter parameters
      * @returns Array of subset/superset matches with live prices
@@ -1244,7 +1244,7 @@ export abstract class PredictionMarketExchange {
     }
 
     /**
-     * Scan for arbitrage opportunities across identity matches.
+     * Scan for arbitrage opportunities across venues. Finds identity matches where the same market is priced differently on different venues, returning opportunities sorted by spread size.
      *
      * @param params - Arbitrage scan parameters (minSpread, category, limit)
      * @returns Array of arbitrage opportunities sorted by spread

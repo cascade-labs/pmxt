@@ -530,7 +530,7 @@ paths:
         or throws EventNotFound.
   '/api/{exchange}/fetchOHLCV':
     get:
-      summary: Fetch O H L C V
+      summary: Fetch OHLCV
       operationId: fetchOHLCV
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
@@ -574,7 +574,7 @@ paths:
           description: Maximum number of results to return
       responses:
         '200':
-          description: Fetch O H L C V response
+          description: Fetch OHLCV response
           content:
             application/json:
               schema:
@@ -1466,7 +1466,7 @@ paths:
         connections.
   '/api/{exchange}/fetchMatches':
     get:
-      summary: Fetch Matches
+      summary: Find Similar Markets
       operationId: fetchMatches
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
@@ -1513,7 +1513,7 @@ paths:
             type: boolean
       responses:
         '200':
-          description: Fetch Matches response
+          description: Find Similar Markets response
           content:
             application/json:
               schema:
@@ -1525,10 +1525,13 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/MatchResult'
-      description: Fetch cross-venue matches for a given market.
+      description: >-
+        Find the same or related market on other venues. Given a market on one venue, discover semantically equivalent
+        markets across every other venue PMXT ingests — each with a relation type (identity, subset, superset, overlap,
+        disjoint), confidence score, and reasoning.
   '/api/{exchange}/fetchEventMatches':
     get:
-      summary: Fetch Event Matches
+      summary: Find Similar Events
       operationId: fetchEventMatches
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
@@ -1570,7 +1573,7 @@ paths:
             type: boolean
       responses:
         '200':
-          description: Fetch Event Matches response
+          description: Find Similar Events response
           content:
             application/json:
               schema:
@@ -1582,10 +1585,12 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/EventMatchResult'
-      description: Fetch cross-venue matches for a given event.
+      description: >-
+        Find the same or related event on other venues. Given an event on one venue, discover semantically equivalent
+        events across every other venue PMXT ingests — including market-level match details for each child market.
   '/api/{exchange}/compareMarketPrices':
     post:
-      summary: Compare Market Prices
+      summary: Compare Prices Across Venues
       operationId: compareMarketPrices
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
@@ -1608,7 +1613,7 @@ paths:
                 - args
       responses:
         '200':
-          description: Compare Market Prices response
+          description: Compare Prices Across Venues response
           content:
             application/json:
               schema:
@@ -1620,10 +1625,12 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/PriceComparison'
-      description: Compare prices across venues for identity matches of a market.
+      description: >-
+        Compare live prices for the same market across venues. Finds identity matches and returns side-by-side best
+        bid/ask prices so you can spot price differences at a glance.
   '/api/{exchange}/fetchHedges':
     get:
-      summary: Fetch Hedges
+      summary: Find Hedging Opportunities
       operationId: fetchHedges
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
@@ -1670,7 +1677,7 @@ paths:
             type: boolean
       responses:
         '200':
-          description: Fetch Hedges response
+          description: Find Hedging Opportunities response
           content:
             application/json:
               schema:
@@ -1682,10 +1689,12 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/PriceComparison'
-      description: Find hedging opportunities via subset/superset matches across venues.
+      description: >-
+        Find hedging opportunities across venues. Discovers subset/superset market relationships where one market's
+        outcome implies another, enabling cross-venue hedging strategies with live prices.
   '/api/{exchange}/fetchArbitrage':
     get:
-      summary: Fetch Arbitrage
+      summary: Find Arbitrage Opportunities
       operationId: fetchArbitrage
       parameters:
         - $ref: '#/components/parameters/ExchangeParam'
@@ -1706,7 +1715,7 @@ paths:
             type: number
       responses:
         '200':
-          description: Fetch Arbitrage response
+          description: Find Arbitrage Opportunities response
           content:
             application/json:
               schema:
@@ -1718,7 +1727,9 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/ArbitrageOpportunity'
-      description: Scan for arbitrage opportunities across identity matches.
+      description: >-
+        Scan for arbitrage opportunities across venues. Finds identity matches where the same market is priced
+        differently on different venues, returning opportunities sorted by spread size.
 components:
   parameters:
     ExchangeParam:

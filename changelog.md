@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.33.4] - 2026-04-23
+
+### Improvements
+
+- **API reference sidebar follows Event → Market hierarchy**: Renamed
+  "Markets & Events" to "Events & Markets" and reordered so events
+  appear before markets, matching the documented data model.
+
+- **Cross-Venue section replaces "Matching"**: Renamed the sidebar group
+  from "Matching" to "Cross-Venue" — clearer for users unfamiliar with
+  the feature. Endpoint titles rewritten: "Find Similar Events", "Find
+  Similar Markets", "Compare Prices Across Venues", "Find Hedging
+  Opportunities", "Find Arbitrage Opportunities".
+
+- **Richer API reference descriptions**: Every Cross-Venue endpoint now
+  has a plain-language description explaining what it does and why you'd
+  use it, instead of terse "Fetch cross-venue matches for a given event."
+
+- **Removed filterMarkets / filterEvents from API docs**: These are
+  SDK-only helpers (local filtering), not API endpoints users should call
+  directly. Hidden from the sidebar via `HIDDEN_OPERATIONS`.
+
+- **Fixed "Fetch O H L C V" title**: `camelToTitle` now preserves
+  acronyms — renders as "Fetch OHLCV" instead of splitting each letter.
+
 ## [2.33.3] - 2026-04-23
 
 ### Bug Fixes
