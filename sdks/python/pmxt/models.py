@@ -537,3 +537,96 @@ class EventFetchParams(TypedDict, total=False):
     tags: List[str]
     filter: EventFilterCriteria
 
+
+# ----------------------------------------------------------------------------
+# Router Types
+# ----------------------------------------------------------------------------
+
+MatchRelation = Literal["identity", "subset", "superset", "overlap", "disjoint"]
+
+
+@dataclass
+class MatchResult:
+    """A cross-venue market match with relation classification."""
+
+    market: UnifiedMarket
+    """The matched market on another venue."""
+
+    relation: MatchRelation
+    """Set-theoretic relation between the source and matched market."""
+
+    confidence: float
+    """Confidence score (0.0 to 1.0)."""
+
+    reasoning: Optional[str] = None
+    """Human-readable explanation of the match."""
+
+    best_bid: Optional[float] = None
+    """Best bid price on the matched venue (when includePrices=True)."""
+
+    best_ask: Optional[float] = None
+    """Best ask price on the matched venue (when includePrices=True)."""
+
+
+@dataclass
+class EventMatchResult:
+    """A cross-venue event match with constituent market matches."""
+
+    event: UnifiedEvent
+    """The matched event on another venue."""
+
+    market_matches: List[MatchResult]
+    """Cross-venue market matches within this event."""
+
+
+@dataclass
+class PriceComparison:
+    """Side-by-side price comparison for an identity-matched market."""
+
+    market: UnifiedMarket
+    """The matched market."""
+
+    relation: MatchRelation
+    """Relation type (typically 'identity' for price comparisons)."""
+
+    confidence: float
+    """Confidence score (0.0 to 1.0)."""
+
+    reasoning: Optional[str] = None
+    """Human-readable explanation."""
+
+    best_bid: Optional[float] = None
+    """Best bid price on this venue."""
+
+    best_ask: Optional[float] = None
+    """Best ask price on this venue."""
+
+    venue: str = ""
+    """The venue name (e.g. 'kalshi', 'polymarket')."""
+
+
+@dataclass
+class ArbitrageOpportunity:
+    """A cross-venue arbitrage opportunity."""
+
+    market_a: UnifiedMarket
+    """Market on the buy side."""
+
+    market_b: UnifiedMarket
+    """Market on the sell side."""
+
+    spread: float
+    """Price spread (sell_price - buy_price)."""
+
+    buy_venue: str
+    """Venue to buy on."""
+
+    sell_venue: str
+    """Venue to sell on."""
+
+    buy_price: float
+    """Price to buy at."""
+
+    sell_price: float
+    """Price to sell at."""
+

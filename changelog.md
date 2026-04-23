@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.33.2] - 2026-04-23
+
+### Bug Fixes
+
+- **Python SDK missing Router class**: `pmxt.Router()` raised
+  `AttributeError: module 'pmxt' has no attribute 'Router'`. Added
+  `Router` class to the Python SDK with all 5 matching methods
+  (`fetch_matches`, `fetch_event_matches`, `compare_market_prices`,
+  `fetch_hedges`, `fetch_arbitrage`) plus the inherited `fetch_markets`
+  and `fetch_events`. New data models: `MatchResult`, `EventMatchResult`,
+  `PriceComparison`, `ArbitrageOpportunity`, `MatchRelation`.
+
+### Improvements
+
+- **Router docs promoted to dedicated tab**: The Router section is now a
+  top-level tab in the docs nav (Documentation | Router | API Reference)
+  instead of a sidebar group buried under SDK. New pages: overview, search
+  events, search markets, find similar markets, find similar events,
+  compare prices & arbitrage.
+
+- **Introduction leads with Router**: The landing page now opens with the
+  Router as the headline feature instead of listing it as one of four
+  equal cards.
+
+- **Quickstart updated**: Replaced "Router SDK coming soon" note with a
+  link to the Router docs — it's here now.
+
+- **Removed `filterMarkets`/`filterEvents` from API Reference**: These
+  are internal client-side utilities, not meaningful REST endpoints.
+
 ## [2.33.1] - 2026-04-22
 
 ### Bug Fixes

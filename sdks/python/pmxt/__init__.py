@@ -18,6 +18,7 @@ Example:
 
 from .client import Exchange
 from ._exchanges import Polymarket, Limitless, Kalshi, KalshiDemo, Probable, Baozi, Myriad, Opinion, Metaculus, Smarkets, Polymarket_us
+from .router import Router
 from .server_manager import ServerManager
 from .errors import (
     PmxtError,
@@ -54,6 +55,11 @@ from .models import (
     EventFilterCriteria,
     MarketFetchParams,
     EventFetchParams,
+    MatchResult,
+    EventMatchResult,
+    PriceComparison,
+    ArbitrageOpportunity,
+    MatchRelation,
 )
 
 
@@ -137,6 +143,7 @@ __all__ = [
     "Metaculus",
     "Smarkets",
     "Polymarket_us",
+    "Router",
     "Exchange",
     # Server Management
     "ServerManager",
@@ -173,4 +180,9 @@ __all__ = [
     "BuiltOrder",
     "Position",
     "Balance",
+    "MatchResult",
+    "EventMatchResult",
+    "PriceComparison",
+    "ArbitrageOpportunity",
+    "MatchRelation",
 ]
