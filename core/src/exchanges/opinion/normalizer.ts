@@ -18,6 +18,7 @@ import {
     OpinionRawChildMarket,
     OpinionRawOrderBook,
     OpinionRawPricePoint,
+    OpinionRawLatestPrice,
     OpinionRawUserTrade,
     OpinionRawPosition,
     OpinionRawOrder,
@@ -225,6 +226,57 @@ export class OpinionNormalizer implements IExchangeNormalizer<OpinionRawMarket, 
             remaining: orderShares - filledShares,
             timestamp: toMillis(raw.createdAt),
         };
+    }
+
+    // -- Price enrichment -----------------------------------------------------
+
+    /**
+     * Fetch latest prices for all markets in parallel and update outcome prices.
+     *
+     * Opinion's /market endpoint does not include prices, so outcomes are
+     * initially created with a placeholder.  This method calls the supplied
+     * `fetchLatestPrice` callback (backed by /token/latest-price) for the
+     * first outcome of every market, derives the complementary price for
+     * binary outcomes, and re-runs addBinaryOutcomes().
+     *
+     * Uses Promise.allSettled so a single failed price fetch never breaks the
+     * whole batch — markets whose price fetch fails simply keep the placeholder.
+     */
+    async enrichMarketsWithPrices(
+        markets: UnifiedMarket[],
+        fetchLatestPrice: (tokenId: string) => Promise<OpinionRawLatestPrice>,
+    ): Promise<void> {
+        if (markets.length === 0) return;
+
+        const results = await Promise.allSettled(
+            markets.map(async (market) => {
+                const yesOutcome = market.outcomes[0];
+                if (!yesOutcome?.outcomeId) return null;
+
+                const raw = await fetchLatestPrice(yesOutcome.outcomeId);
+                const yesPrice = parseFloat(raw?.price ?? '');
+                if (isNaN(yesPrice)) return null;
+
+                return { marketId: market.marketId, yesPrice };
+            }),
+        );
+
+        const priceMap: Record<string, number> = {};
+        for (const result of results) {
+            if (result.status === 'fulfilled' && result.value) {
+                priceMap[result.value.marketId] = result.value.yesPrice;
+            }
+        }
+
+        for (const market of markets) {
+            const yesPrice = priceMap[market.marketId];
+            if (yesPrice === undefined) continue;
+
+            if (market.outcomes[0]) market.outcomes[0].price = yesPrice;
+            if (market.outcomes[1]) market.outcomes[1].price = 1 - yesPrice;
+
+            addBinaryOutcomes(market);
+        }
     }
 
     // -- Private helpers ------------------------------------------------------

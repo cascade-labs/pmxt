@@ -159,6 +159,7 @@ export class OpinionExchange extends PredictionMarketExchange {
                 if (searchIn === 'description') return descMatch;
                 return titleMatch || descMatch;
             });
+            await this.enrichPrices(filtered);
             return filtered.slice(0, params.limit || 250000);
         }
 
@@ -170,7 +171,9 @@ export class OpinionExchange extends PredictionMarketExchange {
 
         const offset = params?.offset || 0;
         const limit = params?.limit || 250000;
-        return allMarkets.slice(offset, offset + limit);
+        const sliced = allMarkets.slice(offset, offset + limit);
+        await this.enrichPrices(sliced);
+        return sliced;
     }
 
     protected async fetchEventsImpl(
@@ -184,10 +187,15 @@ export class OpinionExchange extends PredictionMarketExchange {
             ? rawEvents.filter((raw) => (raw.marketTitle || '').toLowerCase().includes(query))
             : rawEvents;
 
-        return filtered
+        const events = filtered
             .map((raw) => this.normalizer.normalizeEvent(raw))
             .filter((e): e is UnifiedEvent => e !== null)
             .slice(0, limit);
+
+        const allMarkets = events.flatMap((e) => e.markets);
+        await this.enrichPrices(allMarkets);
+
+        return events;
     }
 
     async fetchOHLCV(
@@ -465,5 +473,12 @@ export class OpinionExchange extends PredictionMarketExchange {
             );
         }
         return this.ws;
+    }
+
+    private async enrichPrices(markets: UnifiedMarket[]): Promise<void> {
+        await this.normalizer.enrichMarketsWithPrices(
+            markets,
+            (tokenId) => this.fetcher.fetchRawLatestPrice(tokenId),
+        );
     }
 }

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.35.1] - 2026-04-24
+
+### Bug Fixes
+
+- **Opinion markets always return price 0.5**: The Opinion API's `/market`
+  endpoint does not include price data, so the normalizer hardcoded
+  `price: 0.5` for every Yes/No outcome. Now enriches markets with real
+  prices by calling `/token/latest-price` for each market's Yes token
+  after normalization, deriving the No price as `1 - yesPrice`. Uses
+  `Promise.allSettled` so a single failed price fetch never breaks the
+  batch. Applies to both `fetchMarkets` and `fetchEvents`. (#112)
+
 ## [2.35.0] - 2026-04-24
 
 ### New Features

@@ -745,3 +745,108 @@ describe('OpinionNormalizer.normalizeOrder', () => {
         expect(order.remaining).toBe(0);
     });
 });
+
+// ---------------------------------------------------------------------------
+// enrichMarketsWithPrices
+// ---------------------------------------------------------------------------
+
+describe('OpinionNormalizer.enrichMarketsWithPrices', () => {
+    test('should update outcome prices from fetchLatestPrice callback', async () => {
+        const market = normalizer.normalizeMarket(RAW_BINARY_MARKET)!;
+        expect(market.outcomes[0].price).toBe(0.5); // placeholder
+
+        await normalizer.enrichMarketsWithPrices(
+            [market],
+            async (_tokenId) => ({
+                tokenId: 'yes-token-abc',
+                price: '0.72',
+                side: 'BUY',
+                size: '100',
+                timestamp: 1700000000000,
+            }),
+        );
+
+        expect(market.outcomes[0].price).toBeCloseTo(0.72);
+        expect(market.outcomes[1].price).toBeCloseTo(0.28);
+    });
+
+    test('should update yes/no convenience properties after enrichment', async () => {
+        const market = normalizer.normalizeMarket(RAW_BINARY_MARKET)!;
+
+        await normalizer.enrichMarketsWithPrices(
+            [market],
+            async () => ({
+                tokenId: 'yes-token-abc',
+                price: '0.80',
+                side: 'BUY',
+                size: '50',
+                timestamp: 1700000000000,
+            }),
+        );
+
+        expect(market.yes!.price).toBeCloseTo(0.80);
+        expect(market.no!.price).toBeCloseTo(0.20);
+    });
+
+    test('should handle multiple markets in parallel', async () => {
+        const m1 = normalizer.normalizeMarket(RAW_BINARY_MARKET)!;
+        const childMarkets = normalizer.normalizeMarketsFromEvent(RAW_CATEGORICAL_MARKET);
+
+        const prices: Record<string, string> = {
+            'yes-token-abc': '0.65',
+            'child-a-yes': '0.40',
+            'child-b-yes': '0.55',
+        };
+
+        await normalizer.enrichMarketsWithPrices(
+            [m1, ...childMarkets],
+            async (tokenId) => ({
+                tokenId,
+                price: prices[tokenId] ?? '0.5',
+                side: 'BUY',
+                size: '100',
+                timestamp: Date.now(),
+            }),
+        );
+
+        expect(m1.outcomes[0].price).toBeCloseTo(0.65);
+        expect(childMarkets[0].outcomes[0].price).toBeCloseTo(0.40);
+        expect(childMarkets[1].outcomes[0].price).toBeCloseTo(0.55);
+    });
+
+    test('should keep placeholder price when fetch fails for a market', async () => {
+        const market = normalizer.normalizeMarket(RAW_BINARY_MARKET)!;
+
+        await normalizer.enrichMarketsWithPrices(
+            [market],
+            async () => { throw new Error('API timeout'); },
+        );
+
+        // Placeholder 0.5 should remain
+        expect(market.outcomes[0].price).toBe(0.5);
+        expect(market.outcomes[1].price).toBe(0.5);
+    });
+
+    test('should skip markets with invalid price response', async () => {
+        const market = normalizer.normalizeMarket(RAW_BINARY_MARKET)!;
+
+        await normalizer.enrichMarketsWithPrices(
+            [market],
+            async () => ({
+                tokenId: 'yes-token-abc',
+                price: '',   // empty/invalid
+                side: 'BUY',
+                size: '0',
+                timestamp: 0,
+            }),
+        );
+
+        expect(market.outcomes[0].price).toBe(0.5);
+    });
+
+    test('should do nothing for empty markets array', async () => {
+        const fetchFn = jest.fn();
+        await normalizer.enrichMarketsWithPrices([], fetchFn);
+        expect(fetchFn).not.toHaveBeenCalled();
+    });
+});
