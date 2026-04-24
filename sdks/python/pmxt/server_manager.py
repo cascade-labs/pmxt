@@ -270,6 +270,20 @@ class ServerManager:
                 time.sleep(0.5)
             except Exception:
                 pass
+
+            # Verify the process is actually dead; escalate to SIGKILL if not
+            if os.name != 'nt':
+                try:
+                    os.kill(pid, 0)  # raises if dead
+                    # Still alive — force kill
+                    import signal
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                        time.sleep(0.2)
+                    except Exception:
+                        pass
+                except (OSError, ProcessLookupError):
+                    pass  # Process is dead — good
         self._remove_stale_lock()
     
     def is_server_alive(self) -> bool:

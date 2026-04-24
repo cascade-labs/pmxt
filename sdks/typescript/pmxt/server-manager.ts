@@ -349,10 +349,23 @@ export class ServerManager {
         if (info && info.pid) {
             try {
                 process.kill(info.pid, 'SIGTERM');
-                // Brief wait
                 await new Promise(resolve => setTimeout(resolve, 500));
             } catch {
-                // Ignore
+                // Process already dead — fall through to lock cleanup
+            }
+
+            // Verify the process is actually dead; escalate to SIGKILL if not
+            try {
+                process.kill(info.pid, 0); // throws if dead
+                // Still alive — force kill
+                try {
+                    process.kill(info.pid, 'SIGKILL');
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                } catch {
+                    // Ignore — SIGKILL may race with natural exit
+                }
+            } catch {
+                // Process is dead — good
             }
         }
         // Remove lock file (best effort)

@@ -453,6 +453,54 @@ export abstract class Exchange {
         return headers;
     }
 
+    /**
+     * Resolve the current sidecar base URL.
+     *
+     * For hosted mode the configured basePath is returned as-is.
+     * For local mode the port is re-read from the lock file on every
+     * call so we pick up sidecar restarts that land on a different port.
+     */
+    private resolveBaseUrl(): string {
+        if (this.isHosted) return this.config.basePath;
+        const port = this.serverManager.getRunningPort();
+        return `http://localhost:${port}`;
+    }
+
+    /**
+     * Execute a fetch with retry on connection failures.
+     *
+     * Only retries on connection-level errors (ECONNREFUSED, ECONNRESET) —
+     * never on HTTP responses (4xx, 5xx). On first connection failure,
+     * attempts to restart the sidecar.
+     */
+    private async fetchWithRetry(
+        input: RequestInfo | URL,
+        init?: RequestInit,
+    ): Promise<Response> {
+        const delays = [200, 500, 1000];
+        let lastError: unknown;
+
+        for (let attempt = 0; attempt <= delays.length; attempt++) {
+            try {
+                return await fetch(input, init);
+            } catch (error) {
+                lastError = error;
+                if (attempt >= delays.length) break;
+
+                // Connection failed — try to restart the sidecar on first failure
+                if (attempt === 0 && !this.isHosted) {
+                    try {
+                        await this.serverManager.ensureServerRunning();
+                    } catch {
+                        // Restart failed — continue retrying anyway
+                    }
+                }
+                await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+            }
+        }
+        throw lastError;
+    }
+
     // Low-Level API Access
 
     /**
@@ -473,14 +521,14 @@ export abstract class Exchange {
     async callApi(operationId: string, params?: Record<string, any>): Promise<any> {
         await this.initPromise;
         try {
-            const url = `${this.config.basePath}/api/${this.exchangeName}/callApi`;
+            const url = `${this.resolveBaseUrl()}/api/${this.exchangeName}/callApi`;
 
             const requestBody: any = {
                 args: [operationId, params],
                 credentials: this.getCredentials()
             };
 
-            const response = await fetch(url, {
+            const response = await this.fetchWithRetry(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -529,13 +577,14 @@ export abstract class Exchange {
         query: Record<string, unknown>,
         args: unknown[],
     ): Promise<any> {
-        const baseUrl = `${this.config.basePath}/api/${this.exchangeName}/${methodName}`;
+        const resolvedBase = this.resolveBaseUrl();
+        const baseUrl = `${resolvedBase}/api/${this.exchangeName}/${methodName}`;
         const hasCredentials = this.getCredentials() !== undefined;
 
         if (!hasCredentials && !this._getReadsUnsupported && !queryHasNestedObject(query)) {
             const qs = buildSidecarQueryString(query);
             const getUrl = qs ? `${baseUrl}?${qs}` : baseUrl;
-            const response = await fetch(getUrl, {
+            const response = await this.fetchWithRetry(getUrl, {
                 method: 'GET',
                 headers: this.getAuthHeaders(),
             });
@@ -559,7 +608,7 @@ export abstract class Exchange {
         }
 
         // POST fallback — identical to the original per-method template.
-        const response = await fetch(baseUrl, {
+        const response = await this.fetchWithRetry(baseUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
             body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -581,7 +630,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             args.push(reload);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/loadMarkets`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/loadMarkets`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -607,7 +656,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (params !== undefined) args.push(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchMarkets`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchMarkets`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -629,7 +678,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (params !== undefined) args.push(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchMarketsPaginated`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchMarketsPaginated`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -655,7 +704,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (params !== undefined) args.push(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchEvents`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchEvents`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -677,7 +726,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (params !== undefined) args.push(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchMarket`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchMarket`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -699,7 +748,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (params !== undefined) args.push(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchEvent`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchEvent`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -721,7 +770,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             args.push(id);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchOrderBook`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchOrderBook`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -743,7 +792,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             args.push(built);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/submitOrder`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/submitOrder`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -765,7 +814,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             args.push(orderId);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/cancelOrder`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/cancelOrder`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -787,7 +836,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             args.push(orderId);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchOrder`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchOrder`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -809,7 +858,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (marketId !== undefined) args.push(marketId);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchOpenOrders`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchOpenOrders`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -831,7 +880,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (params !== undefined) args.push(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchMyTrades`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchMyTrades`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -853,7 +902,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (params !== undefined) args.push(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchClosedOrders`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchClosedOrders`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -875,7 +924,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (params !== undefined) args.push(params);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchAllOrders`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchAllOrders`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -897,7 +946,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (address !== undefined) args.push(address);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchPositions`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchPositions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -919,7 +968,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             if (address !== undefined) args.push(address);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/fetchBalance`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/fetchBalance`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -941,7 +990,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             args.push(id);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/unwatchOrderBook`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/unwatchOrderBook`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -962,7 +1011,7 @@ export abstract class Exchange {
         try {
             const args: any[] = [];
             args.push(address);
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/unwatchAddress`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/unwatchAddress`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -982,7 +1031,7 @@ export abstract class Exchange {
         await this.initPromise;
         try {
             const args: any[] = [];
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/close`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/close`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -1109,7 +1158,7 @@ export abstract class Exchange {
                 args.push(limit);
             }
 
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/watchOrderBook`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/watchOrderBook`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -1173,7 +1222,7 @@ export abstract class Exchange {
                 args.push(limit);
             }
 
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/watchTrades`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/watchTrades`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -1225,7 +1274,7 @@ export abstract class Exchange {
             if (types !== undefined) {
                 args.push(types);
             }
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/watchAddress`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/watchAddress`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args, credentials: this.getCredentials() }),
@@ -1320,7 +1369,7 @@ export abstract class Exchange {
                 paramsDict.fee = params.fee;
             }
 
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/buildOrder`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/buildOrder`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args: [paramsDict], credentials: this.getCredentials() }),
@@ -1396,7 +1445,7 @@ export abstract class Exchange {
                 paramsDict.fee = params.fee;
             }
 
-            const response = await fetch(`${this.config.basePath}/api/${this.exchangeName}/createOrder`, {
+            const response = await this.fetchWithRetry(`${this.resolveBaseUrl()}/api/${this.exchangeName}/createOrder`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
                 body: JSON.stringify({ args: [paramsDict], credentials: this.getCredentials() }),
@@ -1455,9 +1504,9 @@ export abstract class Exchange {
                 body.credentials = credentials;
             }
 
-            const url = `${this.config.basePath}/api/${this.exchangeName}/getExecutionPriceDetailed`;
+            const url = `${this.resolveBaseUrl()}/api/${this.exchangeName}/getExecutionPriceDetailed`;
 
-            const response = await fetch(url, {
+            const response = await this.fetchWithRetry(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
