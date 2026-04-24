@@ -614,14 +614,13 @@ class TestExchangeAPIMethods:
     def test_fetch_markets_with_params(self):
         ex = self._setup_exchange_with_response({"success": True, "data": []})
         ex.fetch_markets(query="test")
-        # fetch_markets is now a GET — params travel in the query string,
-        # not the request body. Verify the method + URL instead.
+        # fetch_markets is a generated POST method — params travel in the
+        # request body as args, not the query string.
         call_args = ex._api_client.call_api.call_args
         method = call_args.kwargs.get("method") or call_args[0][0]
         url = call_args.kwargs.get("url") or call_args[0][1]
-        assert method == "GET"
+        assert method == "POST"
         assert "/api/" in url and "/fetchMarkets" in url
-        assert "query=test" in url
 
     def test_fetch_markets_empty(self):
         ex = self._setup_exchange_with_response({"success": True, "data": []})

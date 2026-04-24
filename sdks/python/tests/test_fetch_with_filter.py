@@ -145,8 +145,8 @@ class TestFetchMarketsFilter:
         assert len(markets) == 2  # filter is applied server-side, not in SDK
         assert all(isinstance(m, UnifiedMarket) for m in markets)
 
-    def test_fetch_markets_without_filter_uses_get(self):
-        """Without filter, should use GET (flat query string)."""
+    def test_fetch_markets_without_filter_uses_post(self):
+        """fetch_markets is a generated POST method — always uses POST."""
         exchange = _create_exchange()
         mock_resp = _make_mock_response({
             "success": True,
@@ -157,7 +157,7 @@ class TestFetchMarketsFilter:
             exchange.fetch_markets({"query": "trump"})
 
             call_kwargs = mock_call.call_args
-            assert call_kwargs[1]["method"] == "GET"
+            assert call_kwargs[1]["method"] == "POST"
 
 
 # ---------------------------------------------------------------------------

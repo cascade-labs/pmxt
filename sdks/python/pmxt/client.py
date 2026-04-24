@@ -753,8 +753,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return [_convert_market(e) for e in data]
-        except Exception as e:
-            raise Exception(f"Failed to fetch_markets: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_markets_paginated(self, params: Optional[dict] = None, **kwargs) -> PaginatedMarketsResult:
         try:
@@ -780,8 +780,8 @@ class Exchange(ABC):
                 total=data.get("total", 0),
                 next_cursor=data.get("nextCursor"),
             )
-        except Exception as e:
-            raise Exception(f"Failed to fetch_markets_paginated: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_events(self, params: Optional[dict] = None, **kwargs) -> List[UnifiedEvent]:
         try:
@@ -803,8 +803,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return [_convert_event(e) for e in data]
-        except Exception as e:
-            raise Exception(f"Failed to fetch_events: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_market(self, params: Optional[dict] = None, **kwargs) -> UnifiedMarket:
         try:
@@ -826,8 +826,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return _convert_market(data)
-        except Exception as e:
-            raise Exception(f"Failed to fetch_market: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_event(self, params: Optional[dict] = None, **kwargs) -> UnifiedEvent:
         try:
@@ -849,8 +849,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return _convert_event(data)
-        except Exception as e:
-            raise Exception(f"Failed to fetch_event: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_order_book(self, id: str) -> OrderBook:
         try:
@@ -869,8 +869,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return _convert_order_book(data)
-        except Exception as e:
-            raise Exception(f"Failed to fetch_order_book: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def cancel_order(self, order_id: str) -> Order:
         try:
@@ -889,8 +889,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return _convert_order(data)
-        except Exception as e:
-            raise Exception(f"Failed to cancel_order: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_order(self, order_id: str) -> Order:
         try:
@@ -909,8 +909,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return _convert_order(data)
-        except Exception as e:
-            raise Exception(f"Failed to fetch_order: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_open_orders(self, market_id: Optional[str] = None) -> List[Order]:
         try:
@@ -930,8 +930,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return [_convert_order(e) for e in data]
-        except Exception as e:
-            raise Exception(f"Failed to fetch_open_orders: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_my_trades(self, params: Optional[dict] = None, **kwargs) -> List[UserTrade]:
         try:
@@ -953,8 +953,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return [_convert_user_trade(e) for e in data]
-        except Exception as e:
-            raise Exception(f"Failed to fetch_my_trades: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_closed_orders(self, params: Optional[dict] = None, **kwargs) -> List[Order]:
         try:
@@ -976,8 +976,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return [_convert_order(e) for e in data]
-        except Exception as e:
-            raise Exception(f"Failed to fetch_closed_orders: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_all_orders(self, params: Optional[dict] = None, **kwargs) -> List[Order]:
         try:
@@ -999,8 +999,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return [_convert_order(e) for e in data]
-        except Exception as e:
-            raise Exception(f"Failed to fetch_all_orders: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_positions(self, address: Optional[str] = None) -> List[Position]:
         try:
@@ -1020,8 +1020,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return [_convert_position(e) for e in data]
-        except Exception as e:
-            raise Exception(f"Failed to fetch_positions: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def fetch_balance(self, address: Optional[str] = None) -> List[Balance]:
         try:
@@ -1041,8 +1041,8 @@ class Exchange(ABC):
             response.read()
             data = self._handle_response(json.loads(response.data))
             return [_convert_balance(e) for e in data]
-        except Exception as e:
-            raise Exception(f"Failed to fetch_balance: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def unwatch_order_book(self, id: str) -> None:
         try:
@@ -1060,8 +1060,8 @@ class Exchange(ABC):
             )
             response.read()
             self._handle_response(json.loads(response.data))
-        except Exception as e:
-            raise Exception(f"Failed to unwatch_order_book: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def unwatch_address(self, address: str) -> None:
         try:
@@ -1079,8 +1079,8 @@ class Exchange(ABC):
             )
             response.read()
             self._handle_response(json.loads(response.data))
-        except Exception as e:
-            raise Exception(f"Failed to unwatch_address: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     def close(self) -> None:
         try:
@@ -1097,8 +1097,141 @@ class Exchange(ABC):
             )
             response.read()
             self._handle_response(json.loads(response.data))
-        except Exception as e:
-            raise Exception(f"Failed to close: {self._extract_api_error(e)}") from None
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
+
+    def fetch_market_matches(self, params: dict, **kwargs) -> List[Any]:
+        try:
+            args = []
+            if kwargs:
+                params = {**(params or {}), **kwargs}
+            args.append(params)
+            body: dict = {"args": args}
+            creds = self._get_credentials_dict()
+            if creds:
+                body["credentials"] = creds
+            url = f"{self._resolve_sidecar_host()}/api/{self.exchange_name}/fetchMarketMatches"
+            headers = {"Content-Type": "application/json", "Accept": "application/json"}
+            headers.update(self._get_auth_headers())
+            response = self._fetch_with_retry(
+                lambda: self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
+            )
+            response.read()
+            data = self._handle_response(json.loads(response.data))
+            return data
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
+
+    def fetch_matches(self, params: dict, **kwargs) -> List[Any]:
+        try:
+            args = []
+            if kwargs:
+                params = {**(params or {}), **kwargs}
+            args.append(params)
+            body: dict = {"args": args}
+            creds = self._get_credentials_dict()
+            if creds:
+                body["credentials"] = creds
+            url = f"{self._resolve_sidecar_host()}/api/{self.exchange_name}/fetchMatches"
+            headers = {"Content-Type": "application/json", "Accept": "application/json"}
+            headers.update(self._get_auth_headers())
+            response = self._fetch_with_retry(
+                lambda: self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
+            )
+            response.read()
+            data = self._handle_response(json.loads(response.data))
+            return data
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
+
+    def fetch_event_matches(self, params: dict, **kwargs) -> List[Any]:
+        try:
+            args = []
+            if kwargs:
+                params = {**(params or {}), **kwargs}
+            args.append(params)
+            body: dict = {"args": args}
+            creds = self._get_credentials_dict()
+            if creds:
+                body["credentials"] = creds
+            url = f"{self._resolve_sidecar_host()}/api/{self.exchange_name}/fetchEventMatches"
+            headers = {"Content-Type": "application/json", "Accept": "application/json"}
+            headers.update(self._get_auth_headers())
+            response = self._fetch_with_retry(
+                lambda: self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
+            )
+            response.read()
+            data = self._handle_response(json.loads(response.data))
+            return data
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
+
+    def compare_market_prices(self, params: dict, **kwargs) -> List[Any]:
+        try:
+            args = []
+            if kwargs:
+                params = {**(params or {}), **kwargs}
+            args.append(params)
+            body: dict = {"args": args}
+            creds = self._get_credentials_dict()
+            if creds:
+                body["credentials"] = creds
+            url = f"{self._resolve_sidecar_host()}/api/{self.exchange_name}/compareMarketPrices"
+            headers = {"Content-Type": "application/json", "Accept": "application/json"}
+            headers.update(self._get_auth_headers())
+            response = self._fetch_with_retry(
+                lambda: self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
+            )
+            response.read()
+            data = self._handle_response(json.loads(response.data))
+            return data
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
+
+    def fetch_hedges(self, params: dict, **kwargs) -> List[Any]:
+        try:
+            args = []
+            if kwargs:
+                params = {**(params or {}), **kwargs}
+            args.append(params)
+            body: dict = {"args": args}
+            creds = self._get_credentials_dict()
+            if creds:
+                body["credentials"] = creds
+            url = f"{self._resolve_sidecar_host()}/api/{self.exchange_name}/fetchHedges"
+            headers = {"Content-Type": "application/json", "Accept": "application/json"}
+            headers.update(self._get_auth_headers())
+            response = self._fetch_with_retry(
+                lambda: self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
+            )
+            response.read()
+            data = self._handle_response(json.loads(response.data))
+            return data
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
+
+    def fetch_arbitrage(self, params: Optional[dict] = None, **kwargs) -> List[Any]:
+        try:
+            args = []
+            if kwargs:
+                params = {**(params or {}), **kwargs}
+            if params is not None:
+                args.append(params)
+            body: dict = {"args": args}
+            creds = self._get_credentials_dict()
+            if creds:
+                body["credentials"] = creds
+            url = f"{self._resolve_sidecar_host()}/api/{self.exchange_name}/fetchArbitrage"
+            headers = {"Content-Type": "application/json", "Accept": "application/json"}
+            headers.update(self._get_auth_headers())
+            response = self._fetch_with_retry(
+                lambda: self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)
+            )
+            response.read()
+            data = self._handle_response(json.loads(response.data))
+            return data
+        except ApiException as e:
+            raise self._parse_api_exception(e) from None
 
     # END GENERATED METHODS
 

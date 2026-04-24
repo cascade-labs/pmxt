@@ -355,14 +355,16 @@ function generatePyMethod(name, params, config, sf) {
         `            creds = self._get_credentials_dict()`,
         `            if creds:`,
         `                body["credentials"] = creds`,
-        `            url = f"{self._api_client.configuration.host}/api/{self.exchange_name}/${name}"`,
+        `            url = f"{self._resolve_sidecar_host()}/api/{self.exchange_name}/${name}"`,
         `            headers = {"Content-Type": "application/json", "Accept": "application/json"}`,
         `            headers.update(self._get_auth_headers())`,
-        `            response = self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)`,
+        `            response = self._fetch_with_retry(`,
+        `                lambda: self._api_client.call_api(method="POST", url=url, body=body, header_params=headers)`,
+        `            )`,
         `            response.read()`,
         returnLines,
-        `        except Exception as e:`,
-        `            raise Exception(f"Failed to ${snakeName}: {self._extract_api_error(e)}") from None`,
+        `        except ApiException as e:`,
+        `            raise self._parse_api_exception(e) from None`,
     ].join('\n');
 }
 

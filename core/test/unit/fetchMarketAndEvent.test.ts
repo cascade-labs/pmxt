@@ -170,7 +170,9 @@ describe('fetchMarket (singular)', () => {
 
         expect(receivedParams).toBeDefined();
         expect(receivedParams!.marketId).toBe('test-id');
-        expect(receivedParams!.limit).toBe(5);
+        // limit is stripped by fetchMarkets before calling fetchMarketsImpl
+        // (it applies limit via .slice() after the impl returns)
+        expect(receivedParams!.limit).toBeUndefined();
     });
 });
 
@@ -235,7 +237,9 @@ describe('fetchEvent (singular)', () => {
 
         expect(receivedParams).toBeDefined();
         expect(receivedParams!.eventId).toBe('test-id');
-        expect(receivedParams!.limit).toBe(5);
+        // limit is stripped by fetchEvents before calling fetchEventsImpl
+        // (it applies limit via .slice() after the impl returns)
+        expect(receivedParams!.limit).toBeUndefined();
     });
 });
 

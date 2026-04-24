@@ -88,6 +88,6 @@ describe('fetchMarketsPaginated cursor pagination', () => {
         const markets = await exchange.fetchMarkets({ limit: 2 });
 
         expect(Array.isArray(markets)).toBe(true);
-        expect(markets).toHaveLength(3); // fetchMarketsImpl in mock ignores limit
+        expect(markets).toHaveLength(2); // fetchMarkets applies limit via .slice()
     });
 });
