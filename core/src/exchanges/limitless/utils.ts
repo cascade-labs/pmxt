@@ -8,28 +8,31 @@ export function mapMarketToUnified(market: any): UnifiedMarket | null {
 
     const outcomes: MarketOutcome[] = [];
 
-    // The new API provides 'tokens' and 'prices'
-    // tokens: { no: "...", yes: "..." }
-    // prices: [noPrice, yesPrice]
+    // The Limitless SDK provides:
+    //   tokens: { yes: "...", no: "..." }
+    //   prices: [yesPrice, noPrice]  (always [yes, no] per SDK docs)
+    // Use explicit key lookup — Object.entries order is not guaranteed to
+    // match the prices array.
     if (market.tokens) {
-        const tokenEntries = Object.entries(market.tokens);
-        // Ensure prices array exists, otherwise default to empty
         const prices = Array.isArray(market.prices) ? market.prices : [];
+        const yesPrice = prices[0] || 0;
+        const noPrice = prices[1] || 0;
 
-        tokenEntries.forEach(([label, tokenId], index) => {
-            const outcomePrice = prices[index] || 0;
-            const outcomeIdValue = tokenId as string;
-
-            outcomes.push({
-                outcomeId: outcomeIdValue,
-                marketId: market.slug,
-                label: label.charAt(0).toUpperCase() + label.slice(1), // Capitalize 'yes'/'no'
-                price: outcomePrice,
-                priceChange24h: 0, // Not directly available in this flat list, can be computed if needed
-                metadata: {
-                    clobTokenId: tokenId as string
-                }
-            });
+        outcomes.push({
+            outcomeId: market.tokens.yes as string,
+            marketId: market.slug,
+            label: 'Yes',
+            price: yesPrice,
+            priceChange24h: 0,
+            metadata: { clobTokenId: market.tokens.yes as string },
+        });
+        outcomes.push({
+            outcomeId: market.tokens.no as string,
+            marketId: market.slug,
+            label: 'No',
+            price: noPrice,
+            priceChange24h: 0,
+            metadata: { clobTokenId: market.tokens.no as string },
         });
     }
 

@@ -23,7 +23,7 @@ const RAW_MARKET: LimitlessRawMarket = {
     title: 'Will BTC hit $100k?',
     description: 'Resolves Yes if Bitcoin reaches $100,000.',
     tokens: { no: 'token-no-1', yes: 'token-yes-1' },
-    prices: [0.35, 0.65],
+    prices: [0.65, 0.35],
     expirationTimestamp: '2025-12-31T00:00:00Z',
     volumeFormatted: 42000,
     volume: 500000,
@@ -73,6 +73,21 @@ describe('LimitlessNormalizer.normalizeMarket', () => {
         const ids = market!.outcomes.map(o => o.outcomeId);
         expect(ids).toContain('token-no-1');
         expect(ids).toContain('token-yes-1');
+    });
+
+    test('should assign prices[0] to Yes and prices[1] to No regardless of tokens key order', () => {
+        const reversed: LimitlessRawMarket = {
+            slug: 'key-order-test',
+            tokens: { no: 'tok-n', yes: 'tok-y' },
+            prices: [0.80, 0.20],
+        };
+        const market = normalizer.normalizeMarket(reversed);
+        const yes = market!.outcomes.find(o => o.label === 'Yes')!;
+        const no = market!.outcomes.find(o => o.label === 'No')!;
+        expect(yes.price).toBe(0.80);
+        expect(yes.outcomeId).toBe('tok-y');
+        expect(no.price).toBe(0.20);
+        expect(no.outcomeId).toBe('tok-n');
     });
 
     test('should return null for null input', () => {

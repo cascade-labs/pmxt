@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.35.2] - 2026-04-24
+
+### Bug Fixes
+
+- **Limitless outcome prices swapped**: The `mapMarketToUnified` helper
+  iterated `Object.entries(market.tokens)` by index to look up prices,
+  but the Limitless SDK defines `prices` as `[yes, no]` while
+  `Object.entries` order depends on key insertion order. When the API
+  returned `tokens: { no, yes }`, prices[0] (Yes price) was assigned to
+  the No outcome and vice-versa. Fixed by using explicit key-based
+  lookup (`market.tokens.yes` / `market.tokens.no`) instead of
+  index-based iteration.
+
 ## [2.35.1] - 2026-04-24
 
 ### Bug Fixes
