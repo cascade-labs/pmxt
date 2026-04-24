@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.34.3] - 2026-04-24
+
+### Bug Fixes
+
+- **Opinion categorical child markets missing `cutoffAt`**: Child markets
+  under Opinion categorical events inherited most parent fields but not
+  `cutoffAt`, causing them to appear as having no expiry. Now correctly
+  inherits the parent's `cutoffAt`. (#110)
+
+- **Sidecar survives updates and crashes require manual restart**: The
+  SIGTERM-based shutdown was insufficient — old sidecar processes survived
+  SDK updates and kept serving stale code. Now escalates to SIGKILL after
+  the grace period. Adds retry with exponential backoff on connection
+  failures across both SDKs, and auto-restarts the sidecar on first
+  ECONNREFUSED so crashes self-heal on the next request. TypeScript SDK
+  now re-reads the lock file port on every request (matching Python)
+  so sidecar restarts on a different port are picked up transparently.
+
+- **SDK generators emitted outdated method bodies**: Generated client
+  methods did not use retry/backoff or dynamic port resolution, diverging
+  from the hand-written methods. Generators now emit `_fetch_with_retry` /
+  `fetchWithRetry` calls with typed error propagation (`PmxtError`
+  subclasses) instead of generic exceptions.
+
 ## [2.34.2] - 2026-04-24
 
 ### Bug Fixes
